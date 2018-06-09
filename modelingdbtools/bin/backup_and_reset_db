@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+# installed
+from orator import DatabaseManager
+import argparse
+import pathlib
+import labkey
+import json
+import os
+
+# self
+from modelingdbtools.schemas import modeling
+from modelingdbtools.utils import handles
+from modelingdbtools.utils import checks
+from modelingdbtools import queries
+
+DESCRIP = """
+Setup and create the Modeling Data Processing Database.
+
+Documentation:
+http://confluence.corp.alleninstitute.org/display/MDL/Modeling+Computation
+"""
+
+def main():
+    parser = argparse.ArgumentParser(description=DESCRIP,
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(dest="connection",
+                        help="Which connection would you like to set up the \
+                        modeling database for")
+    parser.add_argument("-p", "--config-path",
+                        dest="config",
+                        default="/database/configs.json",
+                        help="Where is the connections config file located")
+
+    args = parser.parse_args()
+
+    # create routes
+    local_lookup = handles.handle_local_connection()
+
+    # manage db lookup
+    if args.connection == "local":
+        args.config = local_lookup / "configs.json"
+        db = local_lookup / "local_store.db"
+
+    # ensure config path is pathlib
+    args.config = pathlib.Path(args.config)
+
+    # ensure file exists
+    checks.check_file_exists(args.config)
+
+    # open and read configs
+    with open(args.config) as read_in:
+        configs = json.load(read_in)
+
+    # route local db file
+    if args.connection == "local":
+        configs[args.connection][args.connection]["database"] = str(db)
+
+    # connect to db
+    db = DatabaseManager(configs[args.connection])
+
+    # store all tables as dataframe files
+    tables = list(queries.get_db_tables(db)["tbl_name"])
+    queries.get_tables(db, tables)
+
+    # run table creation
+    # modeling.create_schema(db)
+
+if __name__ == "__main__":
+    main()
