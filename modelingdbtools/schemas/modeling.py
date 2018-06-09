@@ -27,7 +27,6 @@ def create_schema(database):
             table.increments("SourceTypeId")
             table.string("Type", 100).unique()
             table.string("Description").nullable()
-            table.primary("SourceTypeId")
 
         print("Created table: SourceType")
 
@@ -36,8 +35,7 @@ def create_schema(database):
             table.increments("UserId")
             table.string("Name", 50).unique()
             table.string("Description").nullable()
-            table.timestamp("Created")
-            table.primary("UserId")
+            table.datetime("Created")
 
         print("Created table: User")
 
@@ -47,11 +45,10 @@ def create_schema(database):
             table.integer("SourceId")
             table.integer("SourceTypeId")
             table.integer("GroupId")
-            table.timestamp("Created")
+            table.datetime("Created")
             table.string("Key", 50)
             table.string("Value")
             table.string("Parser")
-            table.primary("IotaId")
             table.foreign("SourceTypeId") \
                  .references("SourceTypeId") \
                  .on("SourceType")
@@ -63,16 +60,14 @@ def create_schema(database):
             table.increments("DatasetId")
             table.string("Name").unique()
             table.string("Description").nullable()
-            table.primary("DatasetId")
 
         print("Created table: Dataset")
 
     if not schema.has_table("IotaDatasetJunction"):
         with schema.create("IotaDatasetJunction") as table:
-            table.increments("IotaDatasetJunctionId")
             table.integer("IotaId")
             table.integer("DatasetId")
-            table.primary("IotaDatasetJunctionId")
+            table.primary(["IotaId", "DatasetId"])
             table.foreign("IotaId") \
                  .references("IotaId") \
                  .on("Iota")
@@ -91,9 +86,8 @@ def create_schema(database):
             table.integer("UserId")
             table.string("Name").nullable()
             table.string("Description").nullable()
-            table.timestamp("Begin")
-            table.timestamp("End")
-            table.primary("RunId")
+            table.datetime("Begin")
+            table.datetime("End")
             table.foreign("InputDatasetId") \
                  .references("DatasetId") \
                  .on("Dataset")

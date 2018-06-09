@@ -12,16 +12,11 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-dev
 
-RUN echo "alias python=python3" >> ~/.bashrc
-RUN echo "alias pip=pip3" >> ~/.bashrc
-
 RUN pip3 install --upgrade pip
 
 RUN pip3 install \
     ipython \
-    ipython[all]
-
-RUN pip3 install \
+    ipython[all] \
     jupyter
 
 RUN pip3 install \
@@ -41,5 +36,7 @@ WORKDIR /active
 
 ENV in_docker=True
 
+RUN echo "alias python=python3" >> ~/.bashrc
+RUN echo "alias pip=pip3" >> ~/.bashrc
 RUN echo "pip3 install -e /active" >> ~/.bashrc
 RUN echo "clear" >> ~/.bashrc

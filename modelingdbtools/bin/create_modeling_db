@@ -12,6 +12,7 @@ import os
 from modelingdbtools.utils import checks
 from modelingdbtools.schemas import modeling
 from modelingdbtools.utils import handles
+from modelingdbtools import queries
 
 DESCRIP = """
 Setup and create the Modeling Data Processing Database.
@@ -60,6 +61,13 @@ def main():
 
     # run table creation
     modeling.create_schema(db)
+
+    # TODO:
+    # remove next line
+    queries.add_filler_data(db)
+
+    # queries.display_all_tables(db)
+    queries.get_dataset(db, "test_input_dataset")
 
 if __name__ == "__main__":
     main()
