@@ -31,6 +31,10 @@ def main():
                         dest="config",
                         default="/database/configs.json",
                         help="Where is the connections config file located")
+    parser.add_argument("-s", "--storage-path",
+                        dest="storage",
+                        default="/database/backups/",
+                        help="Where should the backups be stored")
 
     args = parser.parse_args()
 
@@ -59,12 +63,16 @@ def main():
     # connect to db
     db = DatabaseManager(configs[args.connection])
 
-    # store all tables as dataframe files
-    tables = list(queries.get_db_tables(db)["tbl_name"])
-    queries.get_tables(db, tables)
+    # store all tables as csv files
+    queries.store_all_database_tables(db, args.storage)
+    print("-" * 80)
+
+    # drop all tables
+    modeling.drop_schema(db)
+    print("-" * 80)
 
     # run table creation
-    # modeling.create_schema(db)
+    modeling.create_schema(db)
 
 if __name__ == "__main__":
     main()

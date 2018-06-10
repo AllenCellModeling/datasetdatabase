@@ -62,12 +62,8 @@ def main():
     # run table creation
     modeling.create_schema(db)
 
-    # TODO:
-    # remove next line
-    queries.add_filler_data(db)
-
-    # queries.display_all_tables(db)
-    queries.get_dataset(db, "test_input_dataset")
+    # show creation
+    queries.display_all_tables(db)
 
 if __name__ == "__main__":
     main()
