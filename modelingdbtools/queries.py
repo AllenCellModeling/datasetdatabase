@@ -99,7 +99,7 @@ def get_database_schema_tables(database):
     driver = handles.get_database_driver(database)
 
     # use proper key to execute database tables query
-    query = "SELECT * FROM"
+    query = "SELECT * FROM "
     if driver == "sqlite":
         where = "sqlite_master WHERE type='table'"
         tables = database.select((query + "{w}").format(w=where))
@@ -211,7 +211,7 @@ def store_all_database_tables(database, storage="/database/backups/"):
     os.makedirs(storage)
 
     # get all database tables
-    tables = list(get_database_tables(database)["tbl_name"])
+    tables = list(get_database_schema_tables(database)["tbl_name"])
     tables = get_tables(database, tables)
 
     # store each table
@@ -345,7 +345,7 @@ def convert_dataset_to_dataframe(dataset, get_info_items=False):
 
     Errors
     ==========
-    
+
     """
 
     # check types

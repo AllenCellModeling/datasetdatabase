@@ -78,7 +78,7 @@ def get_database_driver(database):
     """
 
     # check types
-    checks.check_types(db, DatabaseManager)
+    checks.check_types(database, DatabaseManager)
 
     # return the driver of the passed database config
-    return db._config[list(db._config.keys())[0]]["driver"]
+    return database._config[list(database._config.keys())[0]]["driver"]
