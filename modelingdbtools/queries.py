@@ -1,5 +1,4 @@
 # installed
-from orator.exceptions.query import QueryException
 from orator import DatabaseManager
 from datetime import datetime
 import pandas as pd
