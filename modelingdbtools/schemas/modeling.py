@@ -6,6 +6,7 @@
 
 # installed
 import orator
+from datetime import datetime
 
 # self
 from ..utils import checks
@@ -120,7 +121,7 @@ def add_schema_testing_data(database):
             {"Type": "Dataset",
              "Description": "Use aics.Modeling.Dataset id to find source"}
         ])
-    except QueryException:
+    except orator.QueryException:
         pass
 
     try:
@@ -132,7 +133,7 @@ def add_schema_testing_data(database):
              "Description": "scrub, noob, etc",
              "Created": datetime.now()}
         ])
-    except QueryException as e:
+    except orator.QueryException as e:
         pass
 
     try:
@@ -201,7 +202,7 @@ def add_schema_testing_data(database):
              "Value": "1",
              "Parser": "int"}
         ])
-    except QueryException:
+    except orator.QueryException:
         pass
 
     try:
@@ -211,7 +212,7 @@ def add_schema_testing_data(database):
             {"Name": "test_output_dataset",
              "Description": "Created by queries.add_filler_data"}
         ])
-    except QueryException:
+    except orator.QueryException:
         pass
 
     try:
@@ -235,7 +236,7 @@ def add_schema_testing_data(database):
             {"IotaId": 9,
              "DatasetId": 2}
         ])
-    except QueryException:
+    except orator.QueryException:
         pass
 
     try:
@@ -249,5 +250,5 @@ def add_schema_testing_data(database):
              "Begin": datetime.now(),
              "End": datetime.now()}
         ])
-    except QueryException:
+    except orator.QueryException:
         pass
