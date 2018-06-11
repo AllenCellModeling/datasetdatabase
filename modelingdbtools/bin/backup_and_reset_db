@@ -12,7 +12,7 @@ import os
 from modelingdbtools.schemas import modeling
 from modelingdbtools.utils import handles
 from modelingdbtools.utils import checks
-from modelingdbtools import queries
+from modelingdbtools.utils import admin
 
 DESCRIP = """
 Setup and create the Modeling Data Processing Database.
@@ -64,7 +64,7 @@ def main():
     db = DatabaseManager(configs[args.connection])
 
     # store all tables as csv files
-    queries.store_all_database_tables(db, args.storage)
+    admin.store_all_database_tables(db, args.storage)
     print("-" * 80)
 
     # drop all tables
@@ -73,6 +73,7 @@ def main():
 
     # run table creation
     modeling.create_schema(db)
+    modeling.add_schema_data(db)
 
 if __name__ == "__main__":
     main()

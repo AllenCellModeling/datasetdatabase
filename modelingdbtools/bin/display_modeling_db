@@ -13,7 +13,7 @@ from pprint import pprint
 # self
 from modelingdbtools.utils import handles
 from modelingdbtools.utils import checks
-from modelingdbtools import queries
+from modelingdbtools.utils import admin
 
 DESCRIP = """
 Show the first 5 entries of the Modeling Data Processing Database.
@@ -61,7 +61,7 @@ def main():
     db = DatabaseManager(configs[args.connection])
 
     # display db
-    queries.display_all_tables(db)
+    admin.display_all_tables(db)
 
 if __name__ == "__main__":
     main()

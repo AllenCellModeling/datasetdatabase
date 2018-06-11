@@ -9,10 +9,10 @@ import json
 import os
 
 # self
-from modelingdbtools.utils import checks
 from modelingdbtools.schemas import modeling
+from modelingdbtools.utils import checks
 from modelingdbtools.utils import handles
-from modelingdbtools import queries
+from modelingdbtools.utils import admin
 
 DESCRIP = """
 Setup and create the Modeling Data Processing Database.
@@ -61,9 +61,10 @@ def main():
 
     # run table creation
     modeling.create_schema(db)
+    modeling.add_schema_data(db)
 
     # show creation
-    queries.display_all_tables(db)
+    admin.display_all_tables(db)
 
 if __name__ == "__main__":
     main()

@@ -37,7 +37,7 @@ def create_schema(database):
     if not schema.has_table("Iota"):
         with schema.create("Iota") as table:
             table.increments("IotaId")
-            table.integer("SourceId")
+            table.string("SourceId")
             table.integer("SourceTypeId")
             table.integer("GroupId")
             table.string("Key", 50)
@@ -112,15 +112,20 @@ def drop_schema(database):
         schema.drop_if_exists(table)
         print("Dropped table:", table)
 
-def add_schema_testing_data(database):
+def add_schema_data(database):
     checks.check_types(database, orator.DatabaseManager)
 
     try:
         database.table("SourceType").insert([
             {"Type": "File",
-             "Description": "Use aics.FMS.File id to find source"},
-            {"Type": "Dataset",
-             "Description": "Use aics.Modeling.Dataset id to find source"}
+             "Description": "Use int(SourceId) = aics.FMS.File.FileId to find \
+             source."},
+            {"Type": "Run",
+             "Description": "Use int(SourceId) = aics.Modeling.Run.RunId to \
+             find source."},
+            {"Type": "Dataframe",
+             "Description": "Uploaded as pandas dataframe, \
+             id = {user}@@{datetime_of_upload}."}
         ])
     except QueryException:
         pass
@@ -129,9 +134,33 @@ def add_schema_testing_data(database):
         database.table("User").insert([
             {"Name": "jacksonb",
              "Description": "admin",
-             "Created": datetime.now()},
-            {"Name": "gregj",
-             "Description": "scrub, noob, etc",
+             "Created": datetime.now()}
+        ])
+    except QueryException as e:
+        pass
+
+def add_schema_testing_data(database):
+    checks.check_types(database, orator.DatabaseManager)
+
+    try:
+        database.table("SourceType").insert([
+            {"Type": "File",
+             "Description": "Use int(SourceId) = aics.FMS.File.FileId to find \
+             source."},
+            {"Type": "Run",
+             "Description": "Use int(SourceId) = aics.Modeling.Run.RunId to \
+             find source."},
+            {"Type": "Dataframe",
+             "Description": "Uploaded as pandas dataframe, \
+             id = {user}@@{datetime_of_upload}."}
+        ])
+    except QueryException:
+        pass
+
+    try:
+        database.table("User").insert([
+            {"Name": "jacksonb",
+             "Description": "admin",
              "Created": datetime.now()}
         ])
     except QueryException as e:
@@ -139,63 +168,63 @@ def add_schema_testing_data(database):
 
     try:
         database.table("Iota").insert([
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "hello",
              "Value": "world1",
              "Parser": "str"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "foo",
              "Value": "bar1",
              "Parser": "str"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "is_test",
              "Value": "True",
              "Parser": "bool"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 1,
              "Created": datetime.now(),
              "Key": "hello",
              "Value": "world2",
              "Parser": "str"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 1,
              "Created": datetime.now(),
              "Key": "foo",
              "Value": "bar2",
              "Parser": "str"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 1,
              "Created": datetime.now(),
              "Key": "is_test",
              "Value": "False",
              "Parser": "bool"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 2,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "dataset_created",
              "Value": "True",
              "Parser": "bool"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 2,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "passed_run",
              "Value": "True",
              "Parser": "bool"},
-            {"SourceId": 1,
+            {"SourceId": "1",
              "SourceTypeId": 2,
              "GroupId": 0,
              "Created": datetime.now(),
