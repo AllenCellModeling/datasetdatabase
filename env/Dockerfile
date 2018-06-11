@@ -1,25 +1,10 @@
-FROM ubuntu:18.04
+FROM jupyter/minimal-notebook
 
-RUN apt-get update && apt-get install -y \
-    software-properties-common
+RUN pip install --upgrade pip
 
-RUN add-apt-repository universe
+EXPOSE 8888
 
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    python3.6 \
-    python3-pip \
-    python3-dev
-
-RUN pip3 install --upgrade pip
-
-RUN pip3 install \
-    ipython \
-    ipython[all] \
-    jupyter
-
-RUN pip3 install \
+RUN pip install \
     numpy \
     scipy \
     pandas \
@@ -28,15 +13,11 @@ RUN pip3 install \
     pathlib \
     psycopg2-binary
 
-# RUN echo "alias jupyter=jupyter notebook \
-#            --ip=127.0.0.1 \
-#            --allow-root" >> ~/.bashrc
-
 WORKDIR /active
 
 ENV in_docker=True
 
 RUN echo "alias python=python3" >> ~/.bashrc
 RUN echo "alias pip=pip3" >> ~/.bashrc
-RUN echo "pip3 install -e /active" >> ~/.bashrc
+RUN echo "pip install -e /active" >> ~/.bashrc
 RUN echo "clear" >> ~/.bashrc

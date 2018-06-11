@@ -111,7 +111,7 @@ def drop_schema(database):
         print("Dropped table:", table)
 
 def add_schema_testing_data(database):
-    checks.check_types(database, DatabaseManager)
+    checks.check_types(database, orator.DatabaseManager)
 
     try:
         database.table("SourceType").insert([
