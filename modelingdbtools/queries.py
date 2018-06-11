@@ -299,7 +299,7 @@ def get_dataset(database,
                .get()
 
     # return the formatted dataset
-    return convert_dataset_to_dataframe(ps.DataFrame(ds.all()), get_info_items)
+    return convert_dataset_to_dataframe(pd.DataFrame(ds.all()), get_info_items)
 
 def convert_dataset_to_dataframe(dataset, get_info_items=False):
     """
