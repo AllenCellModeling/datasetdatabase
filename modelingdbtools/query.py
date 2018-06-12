@@ -1,9 +1,11 @@
 # installed
 from orator import DatabaseManager
 import pandas as pd
+import numpy as np
 
 # self
 from .utils import checks
+from .utils import handles
 
 def get_tables(database, get):
     """
@@ -58,7 +60,8 @@ def get_tables(database, get):
     return tables
 
 def get_dataset(database,
-                datasetname=None,
+                id=None,
+                name=None,
                 sourceid=None,
                 sourcetype=None,
                 get_info_items=False):
@@ -70,10 +73,10 @@ def get_dataset(database,
     ==========
     ```
     >>> db = orator.DatabaseManager(config)
-    >>> get_dataset(db, "test_input_dataset")
+    >>> get_dataset(db, name="test_input_dataset")
     pd.DataFrame ...
 
-    >>> get_dataset(db, "test_input_dataset", get_info_items=True)
+    >>> get_dataset(db, name="test_input_dataset", get_info_items=True)
     pd.DataFrame ...
 
     >>> get_dataset(db, sourceid=1, sourcetype="File")
@@ -85,9 +88,11 @@ def get_dataset(database,
     ==========
     database: orator.DatabaseManager
         Which database you would like to use to retrive the dataset from.
-    datasetname: str, None
+    id: int, numpy.int64, None
         Which dataset you want to retrieve.
-    sourceid: int, None
+    name: str, None
+        Which dataset you want to retrieve.
+    sourceid: int, numpy.int64, None
         Which dataset you want to retrieve based off of the source id and type.
     sourcetype: str, None
         Which dataset you want to retrieve based off of the source id and type.
@@ -108,30 +113,42 @@ def get_dataset(database,
 
     # check types
     checks.check_types(database, DatabaseManager)
-    checks.check_types(datasetname, [str, type(None)])
-    checks.check_types(sourceid, [int, type(None)])
+    checks.check_types(id, [int, np.int64, type(None)])
+    checks.check_types(name, [str, type(None)])
+    checks.check_types(sourceid, [int, np.int64, type(None)])
     checks.check_types(sourcetype, [str, type(None)])
     checks.check_types(get_info_items, bool)
 
-    # must provide either a datasetname or a sourceid and sourcetype
-    if all([datasetname, sourceid, sourcetype]) is None:
-        raise ValueError("Must provide either a dataset name or a sourceid and \
-        sourcetype")
+    # must provide either a name or a sourceid and sourcetype
+    if all([id, name, sourceid, sourcetype]) is None:
+        raise ValueError("Must provide either a dataset id or name, or a \
+        sourceid and sourcetype")
 
     # TODO:
     # handle sourceid and sourcetype joining
 
-    # handle datasetname provided
-    if datasetname is not None:
-        ds = database.table("IotaDatasetJunction") \
-               .join("Iota",
-                    "IotaDatasetJunction.IotaId", "=", "Iota.IotaId") \
-               .join("Dataset",
-                    "IotaDatasetJunction.DatasetId", "=", "Dataset.DatasetId") \
-               .join("SourceType",
-                    "Iota.SourceTypeId", "=", "SourceType.SourceTypeId") \
-               .where("Dataset.Name", "=", datasetname) \
-               .get()
+    ds = database.table("IotaDatasetJunction")
+    ds = ds.join("Iota", "IotaDatasetJunction.IotaId", "=", "Iota.IotaId")
+    ds = ds.join("Dataset",
+                 "IotaDatasetJunction.DatasetId", "=", "Dataset.DatasetId")
+    ds = ds.join("SourceType",
+                 "Iota.SourceTypeId", "=", "SourceType.SourceTypeId")
+
+    # handle id provided
+    if id is not None:
+        ds = ds.where("Dataset.DatasetId", "=", int(id))
+
+    # handle name provided
+    elif name is not None:
+        ds = ds.where("Dataset.Name", "=", name)
+
+    # handle sourceid and type
+    else:
+        ds = ds.where("Iota.SourceId", "=", int(sourceid))
+        ds = ds.where("SourceType.SourceType", "=", sourcetype)
+
+    # get
+    ds = ds.get()
 
     # return the formatted dataset
     return convert_dataset_to_dataframe(pd.DataFrame(ds.all()), get_info_items)
@@ -152,7 +169,7 @@ def convert_dataset_to_dataframe(dataset, get_info_items=False):
                  "IotaDatasetJunction.DatasetId", "=", "Dataset.DatasetId") \
             .join("SourceType",
                  "Iota.SourceTypeId", "=", "SourceType.SourceTypeId") \
-            .where("Dataset.Name", "=", datasetname) \
+            .where("Dataset.Name", "=", "test_dataset") \
             .get()
     >>> convert_dataset_to_dataframe(unformatted)
     pd.DataFrame ...
@@ -193,7 +210,7 @@ def convert_dataset_to_dataframe(dataset, get_info_items=False):
 
         # basic items
         group = {items["Key"]: items["Value"],
-                 (items["Key"] + "(Parser)"): items["Parser"]}
+                 (items["Key"] + "(Type)"): items["ValueType"]}
 
         # info items
         if get_info_items:
@@ -213,7 +230,7 @@ def convert_dataset_to_dataframe(dataset, get_info_items=False):
     # return dataframe
     return pd.DataFrame(list(rows.values()))
 
-def get_items_in_table(database, table, items):
+def get_items_in_table(database, table, items={}):
     # check types
     checks.check_types(database, DatabaseManager)
     checks.check_types(table, str)

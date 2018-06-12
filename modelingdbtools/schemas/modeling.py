@@ -42,9 +42,9 @@ def create_schema(database):
             table.integer("GroupId")
             table.string("Key", 50)
             table.string("Value")
-            table.string("Parser")
+            table.string("ValueType")
             table.datetime("Created")
-            table.unique(["SourceId", "SourceType", "GroupId", "Key"])
+            table.unique(["SourceId", "SourceTypeId", "GroupId", "Key"])
             table.foreign("SourceTypeId") \
                  .references("SourceTypeId") \
                  .on("SourceType")
@@ -123,7 +123,7 @@ def add_schema_data(database):
             {"Type": "Run",
              "Description": "Use int(SourceId) = aics.Modeling.Run.RunId to \
              find source."},
-            {"Type": "Dataframe",
+            {"Type": "pandas.DataFrame",
              "Description": "Uploaded as pandas dataframe, \
              id = {user}@@{datetime_of_upload}."}
         ])
@@ -150,7 +150,7 @@ def add_schema_testing_data(database):
             {"Type": "Run",
              "Description": "Use int(SourceId) = aics.Modeling.Run.RunId to \
              find source."},
-            {"Type": "Dataframe",
+            {"Type": "pandas.DataFrame",
              "Description": "Uploaded as pandas dataframe, \
              id = {user}@@{datetime_of_upload}."}
         ])
@@ -174,63 +174,63 @@ def add_schema_testing_data(database):
              "Created": datetime.now(),
              "Key": "hello",
              "Value": "world1",
-             "Parser": "str"},
+             "ValueType": str(str)},
             {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "foo",
              "Value": "bar1",
-             "Parser": "str"},
+             "ValueType": str(str)},
             {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "is_test",
              "Value": "True",
-             "Parser": "bool"},
+             "ValueType": str(bool)},
             {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 1,
              "Created": datetime.now(),
              "Key": "hello",
              "Value": "world2",
-             "Parser": "str"},
+             "ValueType": str(str)},
             {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 1,
              "Created": datetime.now(),
              "Key": "foo",
              "Value": "bar2",
-             "Parser": "str"},
+             "ValueType": str(str)},
             {"SourceId": "1",
              "SourceTypeId": 1,
              "GroupId": 1,
              "Created": datetime.now(),
              "Key": "is_test",
              "Value": "False",
-             "Parser": "bool"},
+             "ValueType": str(bool)},
             {"SourceId": "1",
              "SourceTypeId": 2,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "dataset_created",
              "Value": "True",
-             "Parser": "bool"},
+             "ValueType": str(bool)},
             {"SourceId": "1",
              "SourceTypeId": 2,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "passed_run",
              "Value": "True",
-             "Parser": "bool"},
+             "ValueType": str(bool)},
             {"SourceId": "1",
              "SourceTypeId": 2,
              "GroupId": 0,
              "Created": datetime.now(),
              "Key": "origin_dataset_id",
              "Value": "1",
-             "Parser": "int"}
+             "ValueType": str(int)}
         ])
     except QueryException:
         pass

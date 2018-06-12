@@ -1,3 +1,4 @@
+import pandas as pd
 import pathlib
 import os
 import re
@@ -208,3 +209,23 @@ def check_file_exists(f, err=CHECK_FILE_EXISTS_ERR):
 
     # raise error
     raise FileNotFoundError(err.format(f=f))
+
+def validate_dataset(dataset, type_map=None, filepath_columns=None):
+    check_types(dataset, pd.DataFrame)
+    check_types(type_map, [dict, type(None)])
+    check_types(filepath_columns, [str, list, type(None)])
+
+    if filepath_columns is not None:
+        filepath_columns = list(filepath_columns)
+
+    for i, row in dataset.iterrows():
+        r = dict(row)
+
+        for key, value in r.items():
+            if type_map is not None:
+                if key in type_map:
+                    check_types(value, type_map[key])
+
+            if filepath_columns is not None:
+                if key in filepath_columns:
+                    check_file_exists(pathlib.Path(value))
