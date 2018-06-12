@@ -2,3 +2,9 @@
 modelingdbtools.egg-info/
 __pycache__/
 .ipynb_checkpoints/
+
+# specific folders
+fp_example/
+
+# generated files
+.DS_STORE

@@ -57,6 +57,7 @@ else
     docker run --rm -it $ROUTEPORT \
         -v /Users/$USER/Documents/dbconnect:/database \
         -v $MOUNTDIR:/active \
+        -e DOCKER_USER="$USER" \
         $IMAGE \
         bash
 fi

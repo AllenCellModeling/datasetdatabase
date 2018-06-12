@@ -5,6 +5,7 @@ from getpass import getuser
 import pandas as pd
 import pathlib
 import orator
+import os
 
 # self
 from .utils import checks
@@ -36,6 +37,8 @@ def upload_dataset(database,
 
     # get user
     user = getuser()
+    if user in ["admin", "root", "jovyan"] and "DOCKER_USER" in os.environ:
+        user = os.environ["DOCKER_USER"]
 
     # check dataset name
     if name is None:

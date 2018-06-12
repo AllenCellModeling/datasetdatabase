@@ -175,7 +175,7 @@ def store_all_database_tables(database, storage="/database/backups/"):
 def add_user(database, user):
     # check types
     checks.check_types(database, DatabaseManager)
-    checks.user(user, str)
+    checks.check_types(user, str)
 
     try:
         database.table("User").insert({
