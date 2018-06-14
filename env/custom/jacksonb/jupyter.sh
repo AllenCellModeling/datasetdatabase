@@ -1,7 +1,7 @@
 #!/bin/sh
 
 IMAGE="modeling_db"
-MOUNTDIR="$(dirname "$PWD")"
+MOUNTDIR="$(dirname $(dirname $(dirname "$PWD")))"
 ROUTEPORT="-p 8888:8888"
 
 if [ "$1" = "-h" ]
@@ -57,7 +57,7 @@ else
     docker run --rm -it \
         -e "PASSWORD=password" \
         $ROUTEPORT \
-        -v /Users/$USER/Documents/dbconnect:/database \
+        -v /home/$USER/active/cell/database:/database \
         -v $MOUNTDIR:/active \
         -e DOCKER_USER="$USER" \
         $IMAGE \

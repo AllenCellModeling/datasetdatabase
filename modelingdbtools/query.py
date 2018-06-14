@@ -64,6 +64,7 @@ def get_dataset(database,
                 name=None,
                 sourceid=None,
                 sourcetype=None,
+                columns=None,
                 get_info_items=False):
     """
     Get, format and return a dataset using either a dataset name or
@@ -96,6 +97,8 @@ def get_dataset(database,
         Which dataset you want to retrieve based off of the source id and type.
     sourcetype: str, None
         Which dataset you want to retrieve based off of the source id and type.
+    columns: str, list, None
+        Which columns (keys) you want to retrieve from the dataset.
     get_info_items: bool
         Should the returned pandas DataFrame contain columns indicating each
         found key value pairings IotaId, SourceId, and SourceTypeId.
@@ -117,6 +120,7 @@ def get_dataset(database,
     checks.check_types(name, [str, type(None)])
     checks.check_types(sourceid, [int, np.int64, type(None)])
     checks.check_types(sourcetype, [str, type(None)])
+    checks.check_types(columns, [str, list, type(None)])
     checks.check_types(get_info_items, bool)
 
     # must provide either a name or a sourceid and sourcetype
@@ -124,11 +128,22 @@ def get_dataset(database,
         raise ValueError("Must provide either a dataset id or name, or a \
         sourceid and sourcetype")
 
-    # TODO:
-    # handle sourceid and sourcetype joining
+    # get merge contents
+    ds = database.table("Iota")
 
-    ds = database.table("IotaDatasetJunction")
-    ds = ds.join("Iota", "IotaDatasetJunction.IotaId", "=", "Iota.IotaId")
+    # handle column filtering
+    if isinstance(columns, str):
+        columns = [columns]
+
+    if isinstance(columns, list):
+        or_where = database.query()
+        for c in columns:
+            or_where = or_where.where('Key', '=', c)
+
+        ds = ds.or_where(or_where)
+
+    ds = ds.join("IotaDatasetJunction",
+                 "Iota.IotaId", "=", "IotaDatasetJunction.IotaId")
     ds = ds.join("Dataset",
                  "IotaDatasetJunction.DatasetId", "=", "Dataset.DatasetId")
     ds = ds.join("SourceType",
@@ -153,7 +168,7 @@ def get_dataset(database,
     # return the formatted dataset
     return convert_dataset_to_dataframe(pd.DataFrame(ds.all()), get_info_items)
 
-def convert_dataset_to_dataframe(dataset, get_info_items=False):
+def convert_dataset_to_dataframe(dataset, get_info_items=False, **kwargs):
     """
     Convert a dataframe of joined Iota, Dataset, and IotaDatasetJunction values
     into a formatted standard dataset dataframe.
@@ -209,11 +224,13 @@ def convert_dataset_to_dataframe(dataset, get_info_items=False):
         items = dict(row)
 
         # basic items
-        group = {items["Key"]: items["Value"],
-                 (items["Key"] + "(Type)"): items["ValueType"]}
+        group = {items["Key"]: handles.cast(items["Value"],
+                                            items["ValueType"],
+                                            **kwargs)}
 
         # info items
         if get_info_items:
+            group[(items["Key"] + "(Type)")] = items["ValueType"]
             group[(items["Key"] + "(IotaId)")] = items["IotaId"]
             group[(items["Key"] + "(SourceId)")] = items["SourceId"]
             group[(items["Key"] + "(SourceTypeId)")] = items["SourceTypeId"]

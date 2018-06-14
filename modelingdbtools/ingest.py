@@ -96,7 +96,7 @@ def upload_dataset(database,
             try:
                 to_add["ValueType"] = str(type_map[key])
             except (TypeError, KeyError):
-                to_add["ValueType"] = str(str)
+                to_add["ValueType"] = str(type(value))
 
             iota[database.table("Iota").insert_get_id(to_add)] = to_add
 

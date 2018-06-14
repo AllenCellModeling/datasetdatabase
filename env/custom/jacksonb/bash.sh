@@ -1,8 +1,8 @@
 #!/bin/sh
 
 IMAGE="modeling_db"
-MOUNTDIR="/home/maxfield/active/cell/aics_modeling_db"
-ROUTEPORT="-p 8080:8888"
+MOUNTDIR="$(dirname "$PWD")"
+ROUTEPORT="-p 8888:8888"
 
 if [ "$1" = "-h" ]
 then
@@ -57,6 +57,7 @@ else
     docker run --rm -it $ROUTEPORT \
         -v /home/$USER/active/cell/database:/database \
         -v $MOUNTDIR:/active \
+        -e DOCKER_USER="$USER" \
         $IMAGE \
         bash
 fi

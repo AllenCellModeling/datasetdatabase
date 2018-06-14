@@ -2,7 +2,7 @@
 
 IMAGE="modeling_db"
 MOUNTDIR="$(dirname "$PWD")"
-ROUTEPORT="-p 8080:8888"
+ROUTEPORT="-p 8888:8888"
 
 if [ "$1" = "-h" ]
 then

@@ -2,6 +2,7 @@
 from orator import DatabaseManager
 from datetime import datetime
 from getpass import getuser
+import numpy as np
 import pathlib
 import os
 
@@ -83,3 +84,29 @@ def get_database_driver(database):
 
     # return the driver of the passed database config
     return database._config[list(database._config.keys())[0]]["driver"]
+
+def cast(value, value_type, **kwargs):
+    # check types
+    checks.check_types(value, str)
+    checks.check_types(value_type, str)
+
+    # easy supported natives
+    native_types = ["int", "float", "bool",
+                    "list", "tuple", "dict", "set"]
+
+    # prep the type string
+    value_type = value_type.replace("<class '", "")[:-2]
+
+    # cast
+    if "numpy.ndarray" in value_type:
+        value = value.replace("[", "")
+        value = value.replace("]", "")
+        result = np.fromstring(value, sep=" ", **kwargs)
+    elif "str" in value_type:
+        result = eval(value_type + "('{v}')".format(v=value))
+    elif value_type in native_types:
+        result = eval(value_type + "({v})".format(v=value))
+    else:
+        result = value
+
+    return result
