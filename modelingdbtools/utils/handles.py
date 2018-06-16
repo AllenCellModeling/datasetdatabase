@@ -2,6 +2,7 @@
 from orator import DatabaseManager
 from datetime import datetime
 from getpass import getuser
+import pandas as pd
 import numpy as np
 import pathlib
 import os
@@ -110,3 +111,52 @@ def cast(value, value_type, **kwargs):
         result = value
 
     return result
+
+def format_paths(dataset, filepath_columns=None, store_unix_filepaths=True):
+    checks.check_types(dataset, pd.DataFrame)
+    checks.check_types(filepath_columns, [str, list, type(None)])
+    checks.check_types(store_unix_filepaths, bool)
+
+    if isinstance(filepath_columns, str):
+        filepath_columns = [filepath_columns]
+
+    if filepath_columns is not None:
+        if store_unix_filepaths:
+            dataset[filepath_columns] = dataset[filepath_columns] \
+                .applymap(lambda fp: change_path(fp))
+        else:
+            dataset[filepath_columns] = dataset[filepath_columns] \
+                .applymap(lambda fp: change_path(fp, "/", "\\"))
+
+    return dataset
+
+def change_path(fp, cur="\\", new="/"):
+    checks.check_types(fp, str)
+    checks.check_types(cur, str)
+    checks.check_types(new, str)
+
+    prev_fp = ""
+    while prev_fp != fp:
+        prev_fp = fp
+        fp = fp.replace(cur, new).replace((new + new), new)
+
+    return fp
+
+def format_data(dataset, type_map=None):
+    checks.check_types(dataset, pd.DataFrame)
+    checks.check_types(type_map, [dict, type(None)])
+
+    if type_map is not None:
+        for key, ctype in type_map.items():
+            dataset[key] = dataset[key].apply(lambda v: quick_cast(v, ctype))
+
+    return dataset
+
+def quick_cast(value, cast_type):
+    try:
+        if not isinstance(value, cast_type):
+            return cast_type(value)
+    except ValueError:
+        raise ValueError("Could not cast:", value, "to:", cast_type)
+
+    return value

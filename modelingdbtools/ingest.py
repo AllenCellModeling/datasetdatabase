@@ -3,6 +3,7 @@ from orator.exceptions.query import QueryException
 from datetime import datetime
 from getpass import getuser
 import pandas as pd
+import numpy as np
 import pathlib
 import orator
 import os
@@ -17,23 +18,29 @@ def upload_dataset(database,
                    name=None,
                    description=None,
                    type_map=None,
+                   validation_map=None,
                    upload_files=False,
-                   filepath_columns=None):
+                   filepath_columns=None,
+                   import_as_type_map=False,
+                   use_unix_paths=True):
     # check types
     checks.check_types(database, orator.DatabaseManager)
     checks.check_types(dataset, [str, pathlib.Path, pd.DataFrame])
     checks.check_types(name, [str, type(None)])
     checks.check_types(description, [str, type(None)])
     checks.check_types(type_map, [dict, type(None)])
+    checks.check_types(validation_map, [dict, type(None)])
     checks.check_types(upload_files, bool)
     checks.check_types(filepath_columns, [str, list, pd.Series, type(None)])
+    checks.check_types(import_as_type_map, bool)
+    checks.check_types(use_unix_paths, bool)
 
     # convert types
     if isinstance(dataset, str):
         dataset = pathlib.Path(dataset)
 
-    if filepath_columns is not None:
-        filepath_columns = list(filepath_columns)
+    if isinstance(filepath_columns, str):
+        filepath_columns = [filepath_columns]
 
     # get user
     user = getuser()
@@ -61,7 +68,12 @@ def upload_dataset(database,
         sourcetypeid = 3
 
     # validate dataset
+    if import_as_type_map:
+        dataset = handles.format_data(dataset, type_map)
+
+    dataset = handles.format_paths(dataset, filepath_columns, use_unix_paths)
     checks.validate_dataset(dataset, type_map, filepath_columns)
+    checks.enforce_values(dataset, validation_map)
 
     # actual dataset name check
     found_ds = get_items_in_table(database, "Dataset", {"Name": name})
@@ -86,17 +98,25 @@ def upload_dataset(database,
 
         r = dict(row)
         for key, value in r.items():
+            if isinstance(value, str):
+                value = value.replace("\n", "")
+
             to_add = {"SourceId": sourceid,
                       "SourceTypeId": sourcetypeid,
                       "GroupId": groupid,
                       "Key": str(key),
                       "Value": str(value),
+                      "ValueType": str(type(value)),
                       "Created": datetime.now()}
 
-            try:
-                to_add["ValueType"] = str(type_map[key])
-            except (TypeError, KeyError):
-                to_add["ValueType"] = str(type(value))
+            if isinstance(value, np.ndarray):
+                arr_info = dict(to_add)
+                to_add["Value"] = np.array_str(value.flatten(), precision=24)
+                arr_info["Key"] = str(key) + "(Reshape)"
+                arr_info["Value"] = str(value.shape)
+                arr_info["ValueType"] = str(type(value.shape))
+
+                iota[database.table("Iota").insert_get_id(arr_info)] = arr_info
 
             iota[database.table("Iota").insert_get_id(to_add)] = to_add
 

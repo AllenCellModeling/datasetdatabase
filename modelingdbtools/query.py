@@ -244,8 +244,21 @@ def convert_dataset_to_dataframe(dataset, get_info_items=False, **kwargs):
             for key, item in group.items():
                 rows[items["GroupId"]][key] = item
 
-    # return dataframe
-    return pd.DataFrame(list(rows.values()))
+    # format dataframe
+    rows = list(rows.values())
+    rshp = "(Reshape)"
+    reshape_cols = [c.replace(rshp, "") for c in rows[0].keys() if rshp in c]
+
+    if len(reshape_cols) > 0:
+        for row in rows:
+            for key, val in row.items():
+                if key in reshape_cols:
+                    row[key] = np.reshape(val, row[key + rshp])
+
+    reshape_cols = [c + rshp for c in reshape_cols]
+
+    # return formatted
+    return pd.DataFrame(rows).drop(columns=reshape_cols)
 
 def get_items_in_table(database, table, items={}):
     # check types

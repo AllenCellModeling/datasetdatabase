@@ -218,14 +218,25 @@ def validate_dataset(dataset, type_map=None, filepath_columns=None):
     if filepath_columns is not None:
         filepath_columns = list(filepath_columns)
 
-    for i, row in dataset.iterrows():
-        r = dict(row)
+    if (type_map is not None) or (filepath_columns is not None):
+        for i, row in dataset.iterrows():
+            for key, value in dict(row).items():
+                if type_map is not None:
+                    if key in type_map:
+                        check_types(value, type_map[key])
 
-        for key, value in r.items():
-            if type_map is not None:
-                if key in type_map:
-                    check_types(value, type_map[key])
+                if filepath_columns is not None:
+                    if key in filepath_columns:
+                        check_file_exists(pathlib.Path(value))
 
-            if filepath_columns is not None:
-                if key in filepath_columns:
-                    check_file_exists(pathlib.Path(value))
+def enforce_values(dataset, validation_map=None):
+    check_types(dataset, pd.DataFrame)
+    check_types(validation_map, [dict, type(None)])
+
+    err = "Dataset failed data check at:\n\tcol:{k}\n\trow:{i}\n\tvalue:{v}"
+
+    if validation_map is not None:
+        for i, row in dataset.iterrows():
+            for k, v in dict(row).items():
+                if k in validation_map:
+                    assert validation_map[k](v), err.format(k=k, i=i, v=v)

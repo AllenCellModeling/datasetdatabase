@@ -61,5 +61,6 @@ else
         -v $MOUNTDIR:/active \
         -e DOCKER_USER="$USER" \
         $IMAGE \
+        # bash -c "pip install -e ."
         bash -c "jupyter notebook"
 fi
