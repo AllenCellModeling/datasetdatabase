@@ -26,11 +26,16 @@ def main():
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(dest="connection",
                         help="Which connection would you like to set up the \
-                        modeling database for")
+                        modeling database for?")
     parser.add_argument("-p", "--config-path",
                         dest="config",
                         default="/database/configs.json",
-                        help="Where is the connections config file located")
+                        help="Where is the connections config file located?")
+    parser.add_argument("-t", "--test",
+                        dest="testing",
+                        action="store_true",
+                        help="Should testing data be added on creation of \
+                        database?")
 
     args = parser.parse_args()
 
@@ -62,6 +67,9 @@ def main():
     # run table creation
     modeling.create_schema(db)
     modeling.add_schema_data(db)
+
+    if args.testing:
+        modeling.add_schema_testing_data(db)
 
     # show creation
     admin.display_all_tables(db)

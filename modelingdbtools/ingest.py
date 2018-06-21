@@ -6,10 +6,12 @@ import pandas as pd
 import numpy as np
 import pathlib
 import orator
+import time
 import os
 
 # self
 from .utils import checks
+from .utils import tools
 from .utils import admin
 from .query import *
 
@@ -82,20 +84,26 @@ def upload_dataset(database,
         name += "@@" + str(datetime.now())
         sourceid = name
 
-    # create dataset
-    datasetid = create_dataset(database, name, description)
-
     # add user if not exists
     if len(get_items_in_table(database, "User", {"Name": user})) > 0:
         admin.add_user(database, user)
 
     # iter dataset and insert iota
     iota = {}
+    current_i = 0
+    start_time = time.time()
+    total_upload = len(dataset)
     for groupid, row in dataset.iterrows():
         # TODO:
         # handle filepaths and fms upload
         # use get userid
 
+        # update progress
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
+
+        # parse row
         r = dict(row)
         for key, value in r.items():
             if isinstance(value, str):
@@ -120,13 +128,29 @@ def upload_dataset(database,
 
             iota[database.table("Iota").insert_get_id(to_add)] = to_add
 
+        # update progress
+        current_i += 1
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
+
     # create the junction items
     iotadataset = []
     for iotaid in iota.keys():
         iotadataset.append({"IotaId": iotaid, "DatasetId": datasetid})
 
-    # create IotaDatasetJuntion items
-    create_iota_dataset_junction_items(database, iotadataset)
+    try:
+        # create dataset
+        datasetid = create_dataset(database, name, description)
+
+        # create IotaDatasetJuntion items
+        create_iota_dataset_junction_items(database, iotadataset)
+    except:
+        # TODO:
+        # better documentation as to why this failed
+        # remove any iota dataset junction items and the dataset item that were
+        # created during the try
+        raise BrokenPipeError("Upload failed...")
 
     # return the newly added dataset row
     ds_info = get_items_in_table(database, "Dataset", {"DatasetId": datasetid})
@@ -158,5 +182,7 @@ def create_iota_dataset_junction_items(database, iotadataset):
     try:
         database.table("IotaDatasetJunction").insert(iotadataset)
     except QueryException as e:
+        # TODO:
+        # better documentation for failure to insert
         print(e)
         pass

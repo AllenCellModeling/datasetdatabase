@@ -7,6 +7,7 @@
 # installed
 from orator.exceptions.query import QueryException
 from datetime import datetime
+import inspect
 import orator
 
 # self
@@ -73,6 +74,18 @@ def create_schema(database):
 
         print("Created table: IotaDatasetJunction")
 
+    if not schema.has_table("Algorithm"):
+        with schema.create("Algorithm") as table:
+            table.increments("AlgorithmId")
+            table.string("Name").unique()
+            table.string("Source")
+            table.string("FullSource").unique()
+            table.integer("OwnerId")
+            table.datetime("Created")
+            table.foreign("OwnerId") \
+                 .references("UserId") \
+                 .on("User")
+
     if not schema.has_table("Run"):
         with schema.create("Run") as table:
             table.increments("RunId")
@@ -90,6 +103,9 @@ def create_schema(database):
             table.foreign("OutputDatasetId") \
                  .references("DatasetId") \
                  .on("Dataset")
+            table.foreign("AlgorithmId") \
+                 .references("AlgorithmId") \
+                 .on("Algorithm")
             table.foreign("UserId") \
                  .references("UserId") \
                  .on("User")
@@ -102,6 +118,7 @@ def drop_schema(database):
     schema = orator.Schema(database)
 
     table_order = ["Run",
+                   "Algorithm",
                    "IotaDatasetJunction",
                    "Dataset",
                    "Iota",
@@ -136,7 +153,7 @@ def add_schema_data(database):
              "Description": "admin",
              "Created": datetime.now()}
         ])
-    except QueryException as e:
+    except QueryException:
         pass
 
 def add_schema_testing_data(database):
@@ -163,7 +180,7 @@ def add_schema_testing_data(database):
              "Description": "admin",
              "Created": datetime.now()}
         ])
-    except QueryException as e:
+    except QueryException:
         pass
 
     try:
@@ -265,6 +282,18 @@ def add_schema_testing_data(database):
              "DatasetId": 2},
             {"IotaId": 9,
              "DatasetId": 2}
+        ])
+    except QueryException:
+        pass
+
+    try:
+        frame_c = inspect.currentframe().f_code
+        database.table("Algorithm").insert([
+            {"Name": frame_c.co_name,
+             "Source": frame_c.co_filename,
+             "FullSource": inspect.getsource(frame_c.co_name),
+             "OwnerId": 1,
+             "Created": datetime.now()}
         ])
     except QueryException:
         pass
