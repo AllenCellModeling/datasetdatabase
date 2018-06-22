@@ -134,14 +134,14 @@ def upload_dataset(database,
                              start_time=start_time,
                              total=total_upload)
 
-    # create the junction items
-    iotadataset = []
-    for iotaid in iota.keys():
-        iotadataset.append({"IotaId": iotaid, "DatasetId": datasetid})
-
     try:
         # create dataset
         datasetid = create_dataset(database, name, description)
+
+        # create the junction items
+        iotadataset = []
+        for iotaid in iota.keys():
+            iotadataset.append({"IotaId": iotaid, "DatasetId": datasetid})
 
         # create IotaDatasetJuntion items
         create_iota_dataset_junction_items(database, iotadataset)
@@ -180,7 +180,8 @@ def create_iota_dataset_junction_items(database, iotadataset):
         checks.check_types(iota_dataset_item, dict)
 
     try:
-        database.table("IotaDatasetJunction").insert(iotadataset)
+        for item in iotadataset:
+           database.table("IotaDatasetJunction").insert(item)
     except QueryException as e:
         # TODO:
         # better documentation for failure to insert
