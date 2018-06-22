@@ -124,9 +124,9 @@ def upload_dataset(database,
                 arr_info["Value"] = str(value.shape)
                 arr_info["ValueType"] = str(type(value.shape))
 
-                iota[database.table("Iota").insert_get_id(arr_info)] = arr_info
+                iota[database.table("Iota").insert_get_id(arr_info, sequence="IotaId")] = arr_info
 
-            iota[database.table("Iota").insert_get_id(to_add)] = to_add
+            iota[database.table("Iota").insert_get_id(to_add, sequence="IotaId")] = to_add
 
         # update progress
         current_i += 1
@@ -137,7 +137,7 @@ def upload_dataset(database,
     try:
         # create dataset
         datasetid = create_dataset(database, name, description)
-
+        print(datasetid)
         # create the junction items
         iotadataset = []
         for iotaid in iota.keys():
@@ -154,7 +154,15 @@ def upload_dataset(database,
 
     # return the newly added dataset row
     ds_info = get_items_in_table(database, "Dataset", {"DatasetId": datasetid})
-    return pd.DataFrame(ds_info.all())
+
+    driver = handles.get_database_driver(database)
+
+    if driver == "sqlite":
+        ds_info = pd.DataFrame(ds_info.all())
+    else:
+        ds_info = pd.DataFrame([i.copy() for i in ds_info])
+
+    return ds_info
 
 def create_dataset(database, name, description):
     # check types
@@ -166,8 +174,9 @@ def create_dataset(database, name, description):
         return database.table("Dataset").insert_get_id({
             "Name": name,
             "Description": description
-        })
-    except QueryException:
+        }, sequence="DatasetId")
+    except QueryException as e:
+        print(e)
         pass
 
 def create_iota_dataset_junction_items(database, iotadataset):
