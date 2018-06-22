@@ -115,6 +115,13 @@ def create_schema(database):
 def drop_schema(database):
     checks.check_types(database, orator.DatabaseManager)
 
+    # TODO:
+    # drop all tables and not just the schema created tables
+    # the tables from the list of tables should already be in reverse order
+    # as the order of the tables in the list of tables is the order they were
+    # added in, meaning if i drop them in reverse order I should encounter no issues
+    # the dream?
+
     schema = orator.Schema(database)
 
     table_order = ["Run",

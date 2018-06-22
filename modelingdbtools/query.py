@@ -1,4 +1,5 @@
 # installed
+from orator.exceptions.query import QueryException
 from orator import DatabaseManager
 import pandas as pd
 import numpy as np
@@ -43,6 +44,9 @@ def get_tables(database, get):
 
     """
 
+    # TODO:
+    # handle get only first n rows, etc using param and string format
+
     # check types
     checks.check_types(database, DatabaseManager)
     checks.check_types(get, [str, list, pd.Series])
@@ -50,11 +54,22 @@ def get_tables(database, get):
     # convert to list
     get = list(get)
 
+    # get database driver
+    driver = handles.get_database_driver(database)
+
     # get all tables and label them in dict
     tables = {}
     for table in get:
-        rows = database.select("SELECT * FROM {t}".format(t=table))
-        tables[table] = pd.DataFrame(rows)
+
+        # handle tables with quotes for upper case names
+        query = """SELECT * FROM "{t}" """
+        rows = database.select(query.format(t=table))
+
+        # handle different return
+        if driver == "sqlite":
+            tables[table] = pd.DataFrame(rows)
+        else:
+            tables[table] = pd.DataFrame([i.copy() for i in rows])
 
     # return tables
     return tables
@@ -165,8 +180,13 @@ def get_dataset(database,
     # get
     ds = ds.get()
 
+    try:
+        ds = convert_dataset_to_dataframe(pd.DataFrame(ds.all()), get_info_items)
+    except:
+        pass
     # return the formatted dataset
-    return convert_dataset_to_dataframe(pd.DataFrame(ds.all()), get_info_items)
+    #return convert_dataset_to_dataframe(pd.DataFrame(ds.all()), get_info_items)
+    return ds
 
 def convert_dataset_to_dataframe(dataset, get_info_items=False, **kwargs):
     """

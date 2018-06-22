@@ -159,8 +159,15 @@ def store_all_database_tables(database, storage="/database/backups/"):
     storage /= str(datetime.now())
     os.makedirs(storage)
 
+    # find driver to navigate proper key
+    driver = handles.get_database_driver(database)
+
     # get all database tables
-    tables = list(get_database_schema_tables(database)["tbl_name"])
+    if driver == "sqlite":
+        tables = list(get_database_schema_tables(database)["tbl_name"])
+    else:
+        tables = list(get_database_schema_tables(database)["tablename"])
+
     tables = get_tables(database, tables)
 
     # store each table
