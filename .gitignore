@@ -1,10 +1,11 @@
 # generated folders
-modelingdbtools.egg-info/
 __pycache__/
 .ipynb_checkpoints/
+modelingdbtools.egg-info/
+datasetdatabase.egg-info/
 
 # specific folders
-fp_example/
+configs/
 
 # generated files
 .DS_STORE

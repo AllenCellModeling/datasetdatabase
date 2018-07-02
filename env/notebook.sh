@@ -5,4 +5,4 @@ docker run --rm -it \
     -e DOCKER_USER="$USER" \
     -v "$(dirname "$PWD")":/active \
     datasetdatabase_dev \
-    bash
+    bash -c "jupyter notebook"
