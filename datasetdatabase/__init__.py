@@ -1,1 +1,1 @@
-from .core import connectionmanager, datasetdatabase
+from .core import ConnectionManager, DatasetDatabase

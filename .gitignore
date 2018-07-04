@@ -1,5 +1,6 @@
 # generated folders
 __pycache__/
+local_database/
 .ipynb_checkpoints/
 modelingdbtools.egg-info/
 datasetdatabase.egg-info/
