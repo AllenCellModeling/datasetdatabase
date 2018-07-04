@@ -21,7 +21,10 @@ Found connection: {f}
 
 class ConnectionManager(object):
     """
-
+    A connection manager is an object you will create before you connect to any
+    dataset database. It will store, and manage the creation, backup,
+    restoration, migration, and teardown of different databases in it's
+    connection map.
     """
 
     def __init__(self,
@@ -89,8 +92,6 @@ class ConnectionManager(object):
         AssertionError:
             A database connection, name, or link either was not provided
             properly or already exists.
-        KeyError:
-            A database link with that name already exists.
 
         """
 
@@ -237,6 +238,7 @@ class ConnectionManager(object):
 
     def __getitem__(self, key):
         return self.connections[key]
+
 
     def __str__(self):
         disp = ""

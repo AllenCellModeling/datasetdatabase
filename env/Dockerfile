@@ -5,6 +5,10 @@ RUN pip install --upgrade pip
 EXPOSE 8888
 
 RUN pip install \
+    jupyterlab \
+    jupyterlab-launcher
+
+RUN pip install \
     numpy \
     pandas \
     orator \
