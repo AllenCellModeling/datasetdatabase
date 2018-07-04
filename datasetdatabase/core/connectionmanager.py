@@ -28,19 +28,62 @@ class ConnectionManager(object):
     """
 
     def __init__(self,
-                 configs: Union[str, dict, pathlib.Path, types.NONE] = None,
-                 local_store: Union[str, pathlib.Path, types.NONE] = None):
+                 config: Union[str, dict, pathlib.Path, types.NONE] = None,
+                 **kwargs):
+        """
+        Create a ConnectionManager.
+
+        A connection manager is an object you will create before you connect to
+        any dataset database. It will store, and manage the creation, backup,
+        restoration, migration, and teardown of different databases in it's
+        connection map.
+
+        Example
+        ==========
+        ```
+        >>> ConnectionManager()
+
+        >>> ConnectionManager("local")
+        local:
+            driver: sqlite
+            database: /{cwd}/local_database/local.db
+
+        ```
+
+        Parameters
+        ==========
+        config: str, dict, pathlib.Path, None
+            OS string path, or pathlib.Path to a config file, or a custom
+            dictionary object for database connections. Optionally, provide the
+            string "local" to construct a local database in your current
+            working directory.
+
+            Default: None (Initialize an empty connections map)
+
+        kwargs:
+            All other keyword arguments to be passed to the
+            ConnectionManager.add_connections() function.
+
+        Returns
+        ==========
+        self
+
+        Errors
+        ==========
+        TypeError:
+            Provided config is not a usable type.
+
+        """
 
         # enforce types
-        checks.check_types(configs, [str, dict, pathlib.Path, types.NONE])
-        checks.check_types(local_store, [str, pathlib.Path, types.NONE])
+        checks.check_types(config, [str, dict, pathlib.Path, types.NONE])
 
         # create connections
         self.connections = {}
 
         # handle connections passed
-        if configs is not None:
-            self.add_connections(configs, local_store=local_store)
+        if config is not None:
+            self.add_connections(config, **kwargs)
 
 
     def add_connections(self,
@@ -71,7 +114,8 @@ class ConnectionManager(object):
         config: str, dict, pathlib.Path
             OS string path, or pathlib.Path to a config file, or a custom
             dictionary object for database connections. Optionally, provide the
-            string "local" to construct a local database in your current working directory.
+            string "local" to construct a local database in your current
+            working directory.
 
         override_existing: bool
             On the chance that a database already exists in the connections map
@@ -204,9 +248,9 @@ class ConnectionManager(object):
 
         # enforce connection names
         assert current in self.connections, \
-            "Connection with that name does not exist."
+            "A connection with that name does not exist."
         assert new not in self.connections, \
-            "Connection with that name already exists."
+            "A connection with that name already exists."
 
         # copy config portion and rename
         config = copy.deepcopy(self.connections[current][current])
@@ -218,10 +262,51 @@ class ConnectionManager(object):
         return
 
 
-    def connect(self):
+    def connect(self, name: str, **kwargs) -> DatasetDatabase:
+        """
+        Connect to a dataset database.
 
+        Example
+        ==========
+        ```
+        >>> mngr = ConnectionManager("local")
+        >>> mngr.connect("local")
+        <datasetdatabase.core.datasetdatabase.DatasetDatabase at 01x345678>
 
-        return
+        >>> mngr.connect("missing")
+        AssertionError: "A connection with that name does not exist."
+
+        ```
+
+        Parameters
+        ==========
+        name: str
+            Which dataset database to connect to.
+        kwargs:
+            All other keyword arguments get passed to DatasetDatabase
+            initialization.
+
+        Returns
+        ==========
+        db: datasetdatabase.core.datasetdatabase.DatasetDatabase
+            The initialized DatasetDatabase from the connection desired.
+
+        Errors
+        ==========
+        AssertionError:
+            A connection with that name does not exist.
+
+        """
+
+        # enforce types
+        checks.check_types(key, str)
+
+        # key must exist
+        assert key in self.connections, \
+        "A connection with that name does not exist."
+
+        # return a dataset database object
+        return DatasetDatabase(self.connections[key])
 
 
     def migrate(self):
