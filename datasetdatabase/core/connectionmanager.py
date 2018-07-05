@@ -3,6 +3,8 @@
 # installed
 from typing import Union
 import pathlib
+import getpass
+import types
 import copy
 import json
 import os
@@ -10,7 +12,6 @@ import os
 # self
 from .datasetdatabase import DatasetDatabase
 from ..utils import checks
-from ..utils import types
 
 # globals
 CONNECTION_ALREADY_EXISTS = """
@@ -18,6 +19,7 @@ CONNECTION_ALREADY_EXISTS = """
 A connection with that link already exists.
 Found connection: {f}
 """
+
 
 class ConnectionManager(object):
     """
@@ -27,8 +29,10 @@ class ConnectionManager(object):
     connection map.
     """
 
+
     def __init__(self,
-                 config: Union[str, dict, pathlib.Path, types.NONE] = None,
+                 config: Union[str, dict, pathlib.Path, None] = None,
+                 user: Union[str, None] = None,
                  **kwargs):
         """
         Create a ConnectionManager.
@@ -60,7 +64,12 @@ class ConnectionManager(object):
 
             Default: None (Initialize an empty connections map)
 
-        kwargs:
+        user: str, None
+            Name of the user creating and interacting with database connections.
+
+            Default: None (attempt to get user)
+
+        **kwargs:
             All other keyword arguments to be passed to the
             ConnectionManager.add_connections() function.
 
@@ -76,10 +85,19 @@ class ConnectionManager(object):
         """
 
         # enforce types
-        checks.check_types(config, [str, dict, pathlib.Path, types.NONE])
+        checks.check_types(config, [str, dict, pathlib.Path, type(None)])
+        checks.check_types(user, [str, type(None)])
 
         # create connections
         self.connections = {}
+
+        # handle user
+        if user is None:
+            user = getpass.getuser()
+        if user in ["jovyan", "root", "admin"]:
+            raise ValueError("Could not validate user. Please specify.")
+
+        self.user = user
 
         # handle connections passed
         if config is not None:
@@ -89,7 +107,7 @@ class ConnectionManager(object):
     def add_connections(self,
                         config: Union[str, dict, pathlib.Path],
                         override_existing: bool = False,
-                        local_store: Union[str, pathlib.Path, types.NONE] \
+                        local_store: Union[str, pathlib.Path, None] \
                             = None):
         """
         Add all connections present in a config JSON file. Or create a local
@@ -142,7 +160,7 @@ class ConnectionManager(object):
         # enforce types
         checks.check_types(config, [str, dict, pathlib.Path])
         checks.check_types(override_existing, bool)
-        checks.check_types(local_store, [str, pathlib.Path, types.NONE])
+        checks.check_types(local_store, [str, pathlib.Path, type(None)])
 
         # handle string
         if isinstance(config, str):
@@ -162,7 +180,7 @@ class ConnectionManager(object):
 
                 conn = {"local": {
                             "driver": "sqlite",
-                            "database": storage}
+                            "database": str(storage)}
                         }
 
                 # add local
@@ -282,7 +300,7 @@ class ConnectionManager(object):
         ==========
         name: str
             Which dataset database to connect to.
-        kwargs:
+        **kwargs:
             All other keyword arguments get passed to DatasetDatabase
             initialization.
 
@@ -299,14 +317,14 @@ class ConnectionManager(object):
         """
 
         # enforce types
-        checks.check_types(key, str)
+        checks.check_types(name, str)
 
         # key must exist
-        assert key in self.connections, \
+        assert name in self.connections, \
         "A connection with that name does not exist."
 
         # return a dataset database object
-        return DatasetDatabase(self.connections[key])
+        return DatasetDatabase(self.connections[name], user=self.user, **kwargs)
 
 
     def migrate(self):
@@ -333,9 +351,7 @@ class ConnectionManager(object):
                                                   d=config[name]["driver"],
                                                   l=config[name]["database"])
 
-        disp = disp[:-1]
-
-        return disp
+        return disp[:-1]
 
 
     def __repr__(self):

@@ -3,6 +3,7 @@
 # installed
 from typing import Union
 import pathlib
+import types
 
 CHECK_TYPES_ERR = """
 
@@ -17,8 +18,15 @@ The provided filepath does not exist.
 Given filepath: {f}
 """
 
+CHECK_INGEST_ERR = """
+
+Something besides insertion went wrong...
+{e}
+"""
+
+
 def check_types(var,
-                types: Union[type, list, tuple],
+                allowed: Union[type, list, tuple],
                 err: str = CHECK_TYPES_ERR) -> \
                 Union[bool, TypeError]:
     """
@@ -57,7 +65,7 @@ def check_types(var,
     ==========
     var: object
         A variable to be checked for type.
-    types: type, list, tuple
+    allowed: type, list, tuple
         A single, list, or tuple of types to check the provided variable
         against.
     err: str
@@ -82,11 +90,11 @@ def check_types(var,
         raise TypeError(CHECK_TYPES_ERR.format(a=str, t=type(err), v=err))
 
     # convert to tuple if list passed
-    if isinstance(types, list):
-        types = tuple(types)
+    if isinstance(allowed, list):
+        allowed = tuple(allowed)
 
     # check types
-    if isinstance(var, types):
+    if isinstance(var, allowed):
         return True
 
     # format error
@@ -94,7 +102,7 @@ def check_types(var,
         err += CHECK_TYPES_ERR
 
     # raise error
-    raise TypeError(err.format(a=types, t=type(var), v=var))
+    raise TypeError(err.format(a=allowed, t=type(var), v=var))
 
 
 def check_file_exists(f: Union[str, pathlib.Path],
@@ -162,3 +170,64 @@ def check_file_exists(f: Union[str, pathlib.Path],
 
     # raise error
     raise FileNotFoundError(err.format(f=f))
+
+
+def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
+    -> Union[bool, TypeError]:
+    """
+    Check the provided exception and enforce that it was an ingestion error.
+
+    Example
+    ==========
+    ```
+    >>> e = QueryException("SQL: INSERT INTO...")
+    >>> check_ingest_error(e)
+    True
+
+    >>> e = QueryException("SQL: INSERT INTO...")
+    >>> check_ingest_error(e)
+    TypeError:
+
+    Something besides insertion went wrong...
+    {Full Error}
+
+    >>> check_ingest_error(e, "this message displays first")
+    TypeError: this message displays first
+
+    Something besides insertion went wrong...
+    {Full Error}
+
+    ```
+
+    Parameters
+    ==========
+    e: Exception
+        An error that needs to be checked for ingestion error.
+    err: str
+        An additional error message to be displayed before the standard error
+        should the provided variable not pass type checks.
+
+    Returns
+    ==========
+    was_ingest: bool
+        Returns boolean True if the provided error was an insertion error.
+
+    Errors
+    ==========
+    TypeError:
+        The provided error was not an insertion error.
+
+    """
+
+    # enforce types
+    check_types(err, str)
+
+    if "SQL: INSERT INTO" in str(e):
+        return True
+
+    # format error
+    if CHECK_FILE_EXISTS_ERR not in err:
+        err += CHECK_FILE_EXISTS_ERR
+
+    # raise error
+    raise TypeError(err.format(e=e))
