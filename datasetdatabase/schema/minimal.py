@@ -3,7 +3,6 @@
 # installed
 from datetime import datetime
 import getpass
-import orator
 
 # self
 from ..schema import tables
@@ -33,6 +32,7 @@ def drop_schema(db):
         db.schema.drop_if_exists(tbl)
         del db.tables[tbl]
 
+
 def add_basic_info(db):
     # add SourceType information
     try:
@@ -50,12 +50,13 @@ def add_basic_info(db):
     # add User information
     try:
         db.database.table("User").insert([
-            {"Name": getpass.getuser(),
+            {"Name": db.user,
              "Description": "admin",
              "Created": datetime.now()}
         ])
     except Exception as e:
         checks.check_ingest_error(e)
+
 
 def get_tables(db):
     if db.driver == "sqlite":
@@ -65,8 +66,10 @@ def get_tables(db):
         names = [t["name"] for t in names if t["name"] != "sqlite_sequence"]
     else:
         names = db.database.table("pg_catalog.pg_tables") \
-                           .select("name") \
+                           .select("tablename") \
                            .where("schemaname", "=", "public").get()
-        names = [dict(t)["name"] for t in names]
+
+        names = [dict(t)["tablename"] for t in names]
+        names = [n for n in names if n in TABLES]
 
     return {n: db.database.table(n) for n in names}

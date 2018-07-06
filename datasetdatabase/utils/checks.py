@@ -3,8 +3,10 @@
 # installed
 from typing import Union
 import pathlib
+import getpass
 import types
 
+# globals
 CHECK_TYPES_ERR = """
 
 Allowed types: {a}
@@ -18,11 +20,20 @@ The provided filepath does not exist.
 Given filepath: {f}
 """
 
+CHECK_USER_ERR = """
+
+User: "{u}", is a blacklisted username. Please pass a valid username.
+"""
+
 CHECK_INGEST_ERR = """
 
 Something besides insertion went wrong...
 {e}
 """
+
+BLACKLISTED_USERS = ["jovyan",
+                     "admin",
+                     "root"]
 
 
 def check_types(var,
@@ -65,9 +76,11 @@ def check_types(var,
     ==========
     var: object
         A variable to be checked for type.
+
     allowed: type, list, tuple
         A single, list, or tuple of types to check the provided variable
         against.
+
     err: str
         An additional error message to be displayed before the standard error
         should the provided variable not pass type checks.
@@ -137,6 +150,7 @@ def check_file_exists(f: Union[str, pathlib.Path],
     ==========
     f: str, pathlib.Path
         A string or pathlib.Path filepath to be checked for existence.
+
     err: str
         An additional error message to be displayed before the standard error
         should the provided variable not pass existence checks.
@@ -172,6 +186,77 @@ def check_file_exists(f: Union[str, pathlib.Path],
     raise FileNotFoundError(err.format(f=f))
 
 
+def check_user(user: Union[str, None] = None, err: str = CHECK_USER_ERR) -> \
+    Union[str, ValueError]:
+    """
+    Check or get the username for approval.
+
+    Example
+    ==========
+    ```
+    >>> check_user()
+    jacksonb
+
+    >>> user = "admin"
+    >>> check_user(user)
+    ValueError:
+
+    User: "admin", is a blacklisted username. Please pass a valid username.
+
+    >>> check_user(user, "this message displays first")
+    ValueError: this message displays first
+
+    The provided filepath does not exist.
+    User: "admin", is a blacklisted username. Please pass a valid username.
+
+    ```
+
+    Parameters
+    ==========
+    user: str, None
+        A string username.
+
+        Default: None (getpass.getuser())
+
+    err: str
+        An additional error message to be displayed before the standard error
+        should the provided user not pass blacklist checks.
+
+    Returns
+    ==========
+    user: str
+        Returns string username if the passed or retrieved username passed
+        blacklist checks.
+
+    Errors
+    ==========
+    ValueError:
+        The provided username is in the blacklist.
+
+    """
+
+    # enforce types
+    check_types(user, [str, type(None)])
+    check_types(err, str)
+
+    # get user
+    if user is None:
+        user = getpass.getuser()
+
+    # check allowed
+    if user in BLACKLISTED_USERS:
+
+        # format error
+        if CHECK_USER_ERR not in err:
+            err += CHECK_USER_ERR
+
+        # error
+        raise ValueError(err.format(u=user))
+
+    # return if did not raise
+    return user
+
+
 def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
     -> Union[bool, TypeError]:
     """
@@ -203,6 +288,7 @@ def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
     ==========
     e: Exception
         An error that needs to be checked for ingestion error.
+        
     err: str
         An additional error message to be displayed before the standard error
         should the provided variable not pass type checks.

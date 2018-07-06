@@ -46,7 +46,6 @@ class ConnectionManager(object):
         ==========
         ```
         >>> ConnectionManager()
-
         >>> ConnectionManager("local")
         local:
             driver: sqlite
@@ -79,25 +78,16 @@ class ConnectionManager(object):
 
         Errors
         ==========
-        TypeError:
-            Provided config is not a usable type.
 
         """
 
         # enforce types
         checks.check_types(config, [str, dict, pathlib.Path, type(None)])
         checks.check_types(user, [str, type(None)])
+        self.user = checks.check_user(user)
 
         # create connections
         self.connections = {}
-
-        # handle user
-        if user is None:
-            user = getpass.getuser()
-        if user in ["jovyan", "root", "admin"]:
-            raise ValueError("Could not validate user. Please specify.")
-
-        self.user = user
 
         # handle connections passed
         if config is not None:
@@ -196,7 +186,7 @@ class ConnectionManager(object):
             checks.check_file_exists(config)
 
             with open(config, "r") as read_in:
-                config = json.load(config)
+                config = json.load(read_in)
 
         # check config
         for name, cnfg in config.items():
@@ -243,6 +233,7 @@ class ConnectionManager(object):
         ==========
         current: str
             The current name of the connection you would like to rename.
+
         new: str
             The new name of the connection you would like to rename.
 
@@ -300,6 +291,7 @@ class ConnectionManager(object):
         ==========
         name: str
             Which dataset database to connect to.
+
         **kwargs:
             All other keyword arguments get passed to DatasetDatabase
             initialization.
