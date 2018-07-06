@@ -10,9 +10,11 @@ RUN pip install \
 
 RUN pip install \
     numpy \
+    quilt \
     pandas \
     orator \
     pathlib \
+    pyarrow \
     psycopg2-binary
 
 WORKDIR /active

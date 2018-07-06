@@ -3,17 +3,20 @@
 # installed
 from datetime import datetime
 from typing import Union
+import pyarrow as pa
 import pandas as pd
 import pathlib
 import getpass
 import orator
 import types
+import os
 
 # self
-from ..schema import quiltfile
-from ..schema import aicsfms
+from ..schema.filemanagers import quiltfms
+from ..schema.filemanagers import aicsfms
 from ..schema import minimal
 from ..utils import checks
+from ..utils import tools
 
 
 class DatasetDatabase(object):
@@ -28,7 +31,7 @@ class DatasetDatabase(object):
                  build: bool = True,
                  user: Union[str, None] = None,
                  version: types.ModuleType = minimal,
-                 file_handler: types.ModuleType = quiltfile):
+                 fms: types.ModuleType = quiltfms):
         """
         Create a DatasetDatabase connection.
 
@@ -66,10 +69,18 @@ class DatasetDatabase(object):
         version: module
             Which dataset database version do you want to construct and
             interact with. Can pass your own modules here for extended versions.
-            You module must contain a TABLES global variable, and functions:
+            Custom modules must contain a TABLES global variable, and functions:
             create_schema, drop_schema, add_basic_info, and get_tables.
 
             Default: datasetdatabase.schema.minimal
+
+        fms: module
+            How should files be properly stored, versioned, and retrieved.
+            Can pass your own modules here for extended fms modules.
+            Custom modules must contain functions: set_storage_location,
+            get_or_create_fileid, and get_readpath_from_fileid.
+
+            Default: datasetdatabase.schema.filemanagers.quiltfms
 
         Returns
         ==========
@@ -85,6 +96,7 @@ class DatasetDatabase(object):
         checks.check_types(build, bool)
         checks.check_types(user, [str, type(None)])
         checks.check_types(version, types.ModuleType)
+        checks.check_types(fms, types.ModuleType)
         self.user = checks.check_user(user)
 
         # construct basic items
@@ -92,6 +104,7 @@ class DatasetDatabase(object):
         self.schema = orator.Schema(self.database)
         self.driver = config[list(config.keys())[0]]["driver"]
         self.tables = version.get_tables(self)
+        self.fms = fms
 
         # create tables
         if build:
@@ -175,6 +188,17 @@ class DatasetDatabase(object):
                 name = str(dataset) + "@@" + str(datetime.now())
             else:
                 name = user + "@@" + str(datetime.now())
+
+        # TODO:
+        # handle parquet reading
+
+        # get sourceid
+        if isinstance(dataset, pd.DataFrame):
+            ds_path = tools.create_parquet_file(dataset)
+            sourceid = self.fms.get_or_create_fileid(ds_path)
+            os.remove(ds_path)
+        else:
+            sourceid = self.fms.get_or_create_fileid(dataset)
 
         # read dataset
         if isinstance(dataset, pathlib.Path):

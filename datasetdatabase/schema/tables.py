@@ -8,19 +8,6 @@ from ..schema import tables
 from ..utils import checks
 
 
-def create_SourceType(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("SourceType"):
-        with schema.create("SourceType") as table:
-            table.increments("SourceTypeId")
-            table.string("Type", 100).unique()
-            table.string("Description").nullable()
-            table.datetime("Created").nullable()
-
-
 def create_User(schema: orator.Schema):
     # enforce types
     checks.check_types(schema, orator.Schema)

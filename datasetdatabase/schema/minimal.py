@@ -10,8 +10,7 @@ from ..utils import checks
 
 # globals
 # CREATION ORDER OF TABLES MATTERS
-TABLES = {"SourceType": tables.create_SourceType,
-          "User": tables.create_User,
+TABLES = {"User": tables.create_User,
           "Iota": tables.create_Iota,
           "Dataset": tables.create_Dataset,
           "IotaDatasetJunction": tables.create_IotaDatasetJunction,
@@ -34,19 +33,6 @@ def drop_schema(db):
 
 
 def add_basic_info(db):
-    # add SourceType information
-    try:
-        db.database.table("SourceType").insert([
-            {"Type": "File",
-             "Description": "SourceId is a File GUID if connected to an FMS.",
-             "Created": datetime.now()},
-            {"Type": "Run",
-             "Description": "SourceId is a RunId.",
-             "Created": datetime.now()}
-        ])
-    except Exception as e:
-        checks.check_ingest_error(e)
-
     # add User information
     try:
         db.database.table("User").insert([
