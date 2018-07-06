@@ -10,10 +10,10 @@ import orator
 import types
 
 # self
-from ..schema import filemanager
+from ..schema import quiltfile
+from ..schema import aicsfms
 from ..schema import minimal
 from ..utils import checks
-from ..schema import fms
 
 
 class DatasetDatabase(object):
@@ -28,7 +28,7 @@ class DatasetDatabase(object):
                  build: bool = True,
                  user: Union[str, None] = None,
                  version: types.ModuleType = minimal,
-                 file_handler: types.ModuleType = fms):
+                 file_handler: types.ModuleType = quiltfile):
         """
         Create a DatasetDatabase connection.
 

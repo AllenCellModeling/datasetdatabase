@@ -11,6 +11,7 @@ import os
 
 # self
 from .datasetdatabase import DatasetDatabase
+from ..core import connections
 from ..utils import checks
 
 # globals
@@ -45,8 +46,8 @@ class ConnectionManager(object):
         Example
         ==========
         ```
-        >>> ConnectionManager()
-        >>> ConnectionManager("local")
+        >>> ConnectionManager(LOCAL)
+        >>> ConnectionManager(LOCAL)
         local:
             driver: sqlite
             database: /{cwd}/local_database/local.db
@@ -57,8 +58,8 @@ class ConnectionManager(object):
         ==========
         config: str, dict, pathlib.Path, None
             OS string path, or pathlib.Path to a config file, or a custom
-            dictionary object for database connections. Optionally, provide the
-            string "local" to construct a local database in your current
+            dictionary object for database connections. Optionally, use
+            dsdb.LOCAL to construct a local database in your current
             working directory.
 
             Default: None (Initialize an empty connections map)
@@ -101,13 +102,13 @@ class ConnectionManager(object):
                             = None):
         """
         Add all connections present in a config JSON file. Or create a local
-        database instance using string "local".
+        database instance using dsdb.LOCAL.
 
         Example
         ==========
         ```
         >>> mngr = ConnectionManager()
-        >>> mngr.add_connections("local")
+        >>> mngr.add_connections(LOCAL)
 
         >>> config = "/foo/bar/config.json"
         >>> mngr.add_connections(config)
@@ -121,8 +122,8 @@ class ConnectionManager(object):
         ==========
         config: str, dict, pathlib.Path
             OS string path, or pathlib.Path to a config file, or a custom
-            dictionary object for database connections. Optionally, provide the
-            string "local" to construct a local database in your current
+            dictionary object for database connections. Optionally, use
+            dsdb.LOCAL to construct a local database in your current
             working directory.
 
         override_existing: bool
@@ -155,9 +156,9 @@ class ConnectionManager(object):
         # handle string
         if isinstance(config, str):
             # check for local
-            if "local" == config:
+            if config == connections.LOCAL:
                 if not override_existing:
-                    assert "local" not in self.connections, \
+                    assert config not in self.connections, \
                         "A connection with that name already exists."
 
                 if local_store is None:
@@ -168,13 +169,13 @@ class ConnectionManager(object):
                 else:
                     storage = pathlib.Path(local_store)
 
-                conn = {"local": {
+                conn = {config: {
                             "driver": "sqlite",
                             "database": str(storage)}
                         }
 
                 # add local
-                self.connections["local"] = conn
+                self.connections[config] = conn
                 return
 
             else:
@@ -224,8 +225,8 @@ class ConnectionManager(object):
         Example
         ==========
         ```
-        >>> mngr = ConnectionManager("local")
-        >>> mngr.rename_connection("local", "new_name")
+        >>> mngr = ConnectionManager(dsdb.LOCAL)
+        >>> mngr.rename_connection(dsdb.LOCAL, "new_name")
 
         ```
 
@@ -278,8 +279,8 @@ class ConnectionManager(object):
         Example
         ==========
         ```
-        >>> mngr = ConnectionManager("local")
-        >>> mngr.connect("local")
+        >>> mngr = ConnectionManager(dsdb.LOCAL)
+        >>> mngr.connect(dsdb.LOCAL)
         <datasetdatabase.core.datasetdatabase.DatasetDatabase at 01x345678>
 
         >>> mngr.connect("missing")
