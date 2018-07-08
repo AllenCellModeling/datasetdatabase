@@ -6,6 +6,7 @@ from typing import Union
 import pyarrow as pa
 import pandas as pd
 import pathlib
+import inspect
 import getpass
 import orator
 import types
@@ -14,6 +15,7 @@ import os
 # self
 from ..schema.filemanagers import quiltfms
 from ..schema.filemanagers import aicsfms
+from ..version import __version__
 from ..schema import minimal
 from ..utils import checks
 from ..utils import tools
@@ -113,6 +115,7 @@ class DatasetDatabase(object):
         # recent since connection made
         self.recent = []
 
+
     def construct_tables(self, version: types.ModuleType = minimal):
         """
         Create the tables found in the version module.
@@ -145,8 +148,57 @@ class DatasetDatabase(object):
         self.tables = version.get_tables(self)
 
 
+    def get_items_from_table(self,
+                             table: str,
+                             conditions: Union[list, None]) -> dict:
+        # enforce types
+        checks.check_types(table, str)
+        checks.check_types(conditions, list)
+
+        # construct orator table
+        items = self.db.table(table)
+
+        # was passed multiple conditions
+        if all(isinstance(cond, list) for cond in conditions):
+            for cond in conditions:
+                items = items.where(cond)
+        # was passed single condition
+        else:
+            items = items.where(conditions)
+
+        # get items
+        items = items.get()
+
+        # format return
+        if self.driver == "postgresql":
+            items = [dict(r) for row in items]
+
+        return items
+
+    def insert_to_table(self, table: str, items: dict) \
+        -> dict:
+
+        # enforce types
+        checks.check_types(table, str)
+        checks.check_types(items, dict)
+
+        # try catch ingest
+        id = self.db.table(table).insert_get_id(items)
+        info = get_items_from_table(table, [table + "Id", "=", id])[0]
+        if self.driver == "postgresql":
+            info = dict(info)
+
+        return info
+
+
+
     def create_dataset(self, iotas: list) -> dict:
         return {}
+
+
+    def _create_dataset(self, iotas: list) -> dict:
+        return {}
+
 
     def upload_dataset(self,
                        dataset: Union[str, pathlib.Path, pd.DataFrame],
@@ -170,6 +222,64 @@ class DatasetDatabase(object):
         checks.check_types(filepath_columns, [str, list, type(None)])
         checks.check_types(replace_paths, dict)
 
+        # prep items for run ingest
+        fname = inspect.currentframe().f_code.co_name
+        alg_info = get_items_from_table("Algorithm",
+                                        [["Name", "=", fname],
+                                         ["Version", "=", __version__]])[0]
+        user_info = get_items_from_table("User",
+                                         ["Name", "=", self.user])[0]
+
+        # items
+        input_dataset_id = None
+        alg_id = alg_info["AlgorithmId"]
+        user_id = user_info["UserId"]
+        name = "dataset ingestion"
+        desc = None
+
+        # begin run
+        begin = datetime.now()
+
+        ds_info = _upload_dataset(dataset,
+                                  name,
+                                  description,
+                                  type_map,
+                                  validation_map,
+                                  import_as_type_map,
+                                  upload_files,
+                                  filepath_columns,
+                                  replace_paths)
+
+        output_dataset_id = ds_info["DatasetId"]
+
+        # end run
+        end = datetime.now()
+
+        # process run
+        run_info = insert_to_table(self,
+                        input_dataset_id,
+                        output_dataset_id,
+                        alg_id,
+                        user_id,
+                        name,
+                        desc,
+                        begin,
+                        end)
+
+        return ds_info
+
+
+    def _upload_dataset(self,
+                        dataset: Union[str, pathlib.Path, pd.DataFrame],
+                        name: Union[str, None] = None,
+                        description: Union[str, None] = None,
+                        type_map: Union[dict, None] = None,
+                        validation_map: Union[dict, None] = None,
+                        import_as_type_map: bool = False,
+                        upload_files: bool = False,
+                        filepath_columns: Union[str, list, None] = None,
+                        replace_paths: dict = {"\\": "/"}) -> dict:
+
         # TODO:
         # complete ingest change
         # this counts as a Run
@@ -190,7 +300,9 @@ class DatasetDatabase(object):
                 name = user + "@@" + str(datetime.now())
 
         # TODO:
-        # handle parquet reading
+        # the sourceid needs to be moved out to upload_dataset
+        # input_dataset_id can be fms or run id
+        # table refactor
 
         # get sourceid
         if isinstance(dataset, pd.DataFrame):
@@ -204,24 +316,24 @@ class DatasetDatabase(object):
         if isinstance(dataset, pathlib.Path):
             dataset = pd.read_csv(dataset)
 
-            # TODO:
-            # handle fms upload and get guid
+        # preprocess prep dataset
+        if import_as_type_map:
+            dataset = tools.format_dataset(dataset, type_map)
+        dataset = tools.format_paths(dataset, filepath_columns, replace_paths)
 
-            # TODO:
-            # get or create from table
-            # id of File from SourceTypeTable
+        # check and validate dataset
+        checks.validate_dataset(dataset, type_map, filepath_columns)
+        checks.enforce_values(dataset, validation_map)
 
-        else:
-            pass
-            # TODO:
-            # get or create from table
-            # id of Run from SourceType table
+        # dataset name check and creation
+        found_ds = get_items_from_table("Dataset", ["Name", "=", name])
+        if len(found_ds) > 0:
+            name += "@@" + str(datetime.now())
 
-        # TODO:
-        # create uploaded map
-        # iter dataset, validate, cast, enforce, and add to db
-        # if anything fails, rollback all created from upload map
-
+        # user add
+        if len(get_items_from_table("User", ["Name", "=", self.user])) == 0:
+            insert_to_table("User", {"Name": self.user,
+                                    "Created": datetime.now()})
 
         return
 

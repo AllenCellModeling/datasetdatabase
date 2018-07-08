@@ -5,6 +5,7 @@ from datetime import datetime
 import getpass
 
 # self
+from ..version import __version__
 from ..schema import tables
 from ..utils import checks
 
@@ -33,12 +34,19 @@ def drop_schema(db):
 
 
 def add_basic_info(db):
-    # add User information
+    now = datetime.now()
+
+    # add dsdb Algorithms
     try:
-        db.database.table("User").insert([
-            {"Name": db.user,
-             "Description": "admin",
-             "Created": datetime.now()}
+        db.database.table("Algorithm").insert([
+            {"Name": "upload_dataset",
+             "Version": __version__,
+             "Description": "standard dsdb ingest function",
+             "Created": now},
+            {"Name": "create_dataset",
+             "Version": __version__,
+             "Description": "standard dsdb create function",
+             "Created": now}
         ])
     except Exception as e:
         checks.check_ingest_error(e)

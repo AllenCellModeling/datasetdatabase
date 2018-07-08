@@ -11,13 +11,14 @@ import os
 # self
 from ..utils import checks
 
-# disable prints
+
 def block_print():
     sys.stdout = open(os.devnull, 'w')
 
-# enable prints
+
 def enable_print():
     sys.stdout = sys.__stdout__
+
 
 def create_parquet_file(table: Union[pa.Table, pd.DataFrame],
                         path: Union[str, pathlib.Path, None] = None) \

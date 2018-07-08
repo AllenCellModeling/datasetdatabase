@@ -30,16 +30,12 @@ def create_Iota(schema: orator.Schema):
         with schema.create("Iota") as table:
             table.increments("IotaId")
             table.string("SourceId")
-            table.integer("SourceTypeId")
             table.integer("GroupId")
             table.string("Key", 50)
             table.string("Value")
             table.string("ValueType")
             table.datetime("Created")
-            table.unique(["SourceId", "SourceTypeId", "GroupId", "Key"])
-            table.foreign("SourceTypeId") \
-                 .references("SourceTypeId") \
-                 .on("SourceType")
+            table.unique(["SourceId", "GroupId", "Key"])
 
 
 def create_Dataset(schema: orator.Schema):
@@ -81,13 +77,11 @@ def create_Algorithm(schema: orator.Schema):
     if not schema.has_table("Algorithm"):
         with schema.create("Algorithm") as table:
             table.increments("AlgorithmId")
-            table.string("Name").unique()
-            table.string("Source")
-            table.integer("OwnerId")
+            table.string("Name")
+            table.string("Description").nullable()
+            table.string("Version")
             table.datetime("Created")
-            table.foreign("OwnerId") \
-                 .references("UserId") \
-                 .on("User")
+            table.unique(["Name", "Version"])
 
 
 def create_Run(schema: orator.Schema):

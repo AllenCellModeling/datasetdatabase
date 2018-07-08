@@ -14,7 +14,6 @@ RUN pip install \
     pandas \
     orator \
     pathlib \
-    pyarrow \
     psycopg2-binary
 
 WORKDIR /active

@@ -43,7 +43,8 @@ def get_or_create_fileid(filepath: Union[str, pathlib.Path]) -> str:
                                     _file_as_blockiter(open(filepath, "rb")),
                                     hashlib.md5(),
                                     True)
-    package_name = "dsdb_" + package_name
+
+    package_name = "fms_" + filepath.suffix + "_" + package_name
 
     # check fileid exists
     quilt_store = quilt.tools.store.PackageStore()
