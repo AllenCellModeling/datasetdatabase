@@ -162,6 +162,41 @@ class DatasetDatabase(object):
     def get_items_from_table(self,
                              table: str,
                              conditions: Union[list, None]) -> dict:
+        """
+        Get all items from a table where conditions are met.
+
+        Example
+        ==========
+        ```
+        >>> get_items_from_table("User", ["UserId", "=", 1])
+        {...}
+
+        >>> get_items_from_table("User")
+        [
+         {...},
+         {...},
+         ...
+         {...}
+        ]
+        ```
+
+        Parameters
+        ==========
+        table: str
+            Which table in the database to retrieve items from.
+        conditions: list, None
+            Which conditions to match items for. None for all items return.
+
+        Returns
+        ==========
+        items: list
+            Which items were found matching conditions given.
+
+        Errors
+        ==========
+
+        """
+
         # enforce types
         checks.check_types(table, str)
         checks.check_types(conditions, list)
@@ -209,7 +244,7 @@ class DatasetDatabase(object):
         # update recent
         self.recent.append(info)
         if len(self.recent) > self.cache_size:
-            self.recent = self.recent[:self.cache_size]
+            self.recent = self.recent[1:]
 
         return info
 
@@ -409,9 +444,13 @@ class DatasetDatabase(object):
                                  start_time=start_time,
                                  total=total_upload)
 
+            junction_item = {
+                "IotaId": iota_id,
+                "DatasetId": output_dataset_id,
+                "Created": datetime.now()}
+
             # insert junction item
-            self.database.table("IotaDatasetJunction").insert(
-                {"IotaId": iota_id, "DatasetId": output_dataset_id})
+            self.insert_to_table("IotaDatasetJunction", junction_item)
 
             # update progress
             current_i += 1
@@ -464,7 +503,8 @@ class DatasetDatabase(object):
     def __str__(self):
         disp = "Recent Datasets:"
         for row in self.recent:
-            if "DatasetId" in row:
+            if "DatasetId" in row and \
+                "SourceId" in row:
                 disp += "\n{r}".format(r=row)
 
         return disp

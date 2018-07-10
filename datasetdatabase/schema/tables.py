@@ -105,9 +105,11 @@ def create_IotaDatasetJunction(schema: orator.Schema):
     # create table
     if not schema.has_table("IotaDatasetJunction"):
         with schema.create("IotaDatasetJunction") as table:
+            table.increments("IotaDatasetJunctionId")
             table.integer("IotaId")
             table.integer("DatasetId")
-            table.primary(["IotaId", "DatasetId"])
+            table.datetime("Created")
+            table.unique(["IotaId", "DatasetId"])
             table.foreign("IotaId") \
                  .references("IotaId") \
                  .on("Iota")
