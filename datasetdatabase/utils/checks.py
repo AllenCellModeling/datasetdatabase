@@ -11,7 +11,7 @@ import types
 CHECK_TYPES_ERR = """
 
 Allowed types: {a}
-Given type: {g}
+Given type: {t}
 Given value: {v}
 """
 

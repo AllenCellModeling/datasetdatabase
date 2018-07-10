@@ -58,7 +58,7 @@ def create_Source(schema: orator.Schema):
     if not schema.has_table("Source"):
         with schema.create("Source") as table:
             table.increments("SourceId")
-            table.integer("SourceTypeId")
+            table.integer("SourceTypeId").unsigned()
             table.string("Name").unique()
             table.datetime("Created")
             table.foreign("SourceTypeId") \
@@ -74,7 +74,7 @@ def create_FileSource(schema: orator.Schema):
     if not schema.has_table("FileSource"):
         with schema.create("FileSource") as table:
             table.increments("FileSourceId")
-            table.integer("SourceId")
+            table.integer("SourceId").unsigned()
             table.string("FileId").unique()
             table.foreign("SourceId") \
                  .references("SourceId") \
@@ -91,7 +91,7 @@ def create_Dataset(schema: orator.Schema):
             table.increments("DatasetId")
             table.string("Name").unique()
             table.string("Description").nullable()
-            table.integer("SourceId")
+            table.integer("SourceId").unsigned()
             table.datetime("Created")
             table.foreign("SourceId") \
                  .references("SourceId") \
@@ -106,8 +106,8 @@ def create_IotaDatasetJunction(schema: orator.Schema):
     if not schema.has_table("IotaDatasetJunction"):
         with schema.create("IotaDatasetJunction") as table:
             table.increments("IotaDatasetJunctionId")
-            table.integer("IotaId")
-            table.integer("DatasetId")
+            table.integer("IotaId").unsigned()
+            table.integer("DatasetId").unsigned()
             table.datetime("Created")
             table.unique(["IotaId", "DatasetId"])
             table.foreign("IotaId") \
@@ -141,27 +141,57 @@ def create_Run(schema: orator.Schema):
     if not schema.has_table("Run"):
         with schema.create("Run") as table:
             table.increments("RunId")
-            table.integer("InputDatasetId").nullable()
-            table.integer("OutputDatasetId")
-            table.integer("AlgorithmId")
-            table.integer("UserId")
+            table.integer("AlgorithmId").unsigned()
+            table.integer("UserId").unsigned()
             table.string("Name").nullable()
             table.string("Description").nullable()
             table.datetime("Begin")
             table.datetime("End")
-            table.unique(["InputDatasetId", "AlgorithmId"])
-            table.foreign("InputDatasetId") \
-                 .references("InputDatasetId") \
-                 .on("Dataset")
-            table.foreign("OutputDatasetId") \
-                 .references("DatasetId") \
-                 .on("Dataset")
             table.foreign("AlgorithmId") \
                  .references("AlgorithmId") \
                  .on("Algorithm")
             table.foreign("UserId") \
                  .references("UserId") \
                  .on("User")
+
+
+def create_RunInput(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("RunInput"):
+        with schema.create("RunInput") as table:
+            table.increments("RunInputId")
+            table.integer("RunId").unsigned()
+            table.integer("DatasetId").unsigned()
+            table.datetime("Created")
+            table.foreign("RunId") \
+                 .references("RunId") \
+                 .on("Run")
+            table.foreign("DatasetId") \
+                 .references("DatasetId") \
+                 .on("Dataset")
+
+
+def create_RunOutput(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("RunOutput"):
+        with schema.create("RunOutput") as table:
+            table.increments("RunOutputId")
+            table.integer("RunId").unsigned()
+            table.integer("DatasetId").unsigned()
+            table.datetime("Created")
+            table.foreign("RunId") \
+                 .references("RunId") \
+                 .on("Run")
+            table.foreign("DatasetId") \
+                 .references("DatasetId") \
+                 .on("Dataset")
+
 
 def create_RunSource(schema: orator.Schema):
     # enforce types
@@ -171,8 +201,8 @@ def create_RunSource(schema: orator.Schema):
     if not schema.has_table("RunSource"):
         with schema.create("RunSource") as table:
             table.increments("RunSourceId")
-            table.integer("SourceId")
-            table.integer("RunId")
+            table.integer("SourceId").unsigned()
+            table.integer("RunId").unsigned()
             table.foreign("SourceId") \
                  .references("SourceId") \
                  .on("Source")

@@ -20,6 +20,8 @@ TABLES = {"User": tables.create_User,
           "IotaDatasetJunction": tables.create_IotaDatasetJunction,
           "Algorithm": tables.create_Algorithm,
           "Run": tables.create_Run,
+          "RunInput": tables.create_RunInput,
+          "RunOutput": tables.create_RunOutput,
           "RunSource": tables.create_RunSource}
 
 
@@ -54,19 +56,19 @@ def add_basic_info(db):
         checks.check_ingest_error(e)
 
     # add dsdb Algorithms
-    try:
-        db.database.table("Algorithm").insert([
-            {"Name": "upload_dataset",
-             "Version": __version__,
-             "Description": "DatasetDatabase ingest function",
-             "Created": now},
-            {"Name": "create_dataset",
-             "Version": __version__,
-             "Description": "DatasetDatabase create function",
-             "Created": now}
-        ])
-    except Exception as e:
-        checks.check_ingest_error(e)
+    # try:
+    #     db.database.table("Algorithm").insert([
+    #         {"Name": "upload_dataset",
+    #          "Version": __version__,
+    #          "Description": "DatasetDatabase ingest function",
+    #          "Created": now},
+    #         {"Name": "create_dataset",
+    #          "Version": __version__,
+    #          "Description": "DatasetDatabase create function",
+    #          "Created": now}
+    #     ])
+    # except Exception as e:
+    #     checks.check_ingest_error(e)
 
 
 def get_tables(db):

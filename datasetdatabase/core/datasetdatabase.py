@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Union
 import pandas as pd
 import numpy as np
+import subprocess
 import pathlib
 import inspect
 import getpass
@@ -115,13 +116,14 @@ class DatasetDatabase(object):
         self.cache_size = cache_size
         self.database = orator.DatabaseManager(config)
         self.schema = orator.Schema(self.database)
+        self.schema_version = version
         self.driver = config[list(config.keys())[0]]["driver"]
         self.tables = version.get_tables(self)
         self.fms = fms
 
         # create tables
         if build:
-            self.construct_tables(version)
+            self.construct_tables(self.schema_version)
 
         # recent since connection made
         self.recent = []
@@ -223,6 +225,40 @@ class DatasetDatabase(object):
 
 
     def insert_to_table(self, table: str, items: dict) -> dict:
+        """
+        Insert items into a table. If the item already exists given the unique
+        contraints, it will return the found object.
+
+        Example
+        ==========
+        ```
+        >>> me = {"Name": "jacksonb", "Created", datetime.now()}
+        >>> insert_to_table("User", me)
+        {"UserId": 1, "Name": "jacksonb", "Description": None, "Created": ...}
+
+        >>> insert_to_table("User", me)
+        {"UserId": 1, "Name": "jacksonb", "Description": None, "Created": ...}
+
+        ```
+
+        Parameters
+        ==========
+        table: str
+            Which table to insert into.
+        items: dict
+            Which items to insert.
+
+        Returns
+        ==========
+        The row of data that was created or found.
+
+        Errors
+        ==========
+        ValueError:
+            Missing non-nullable values for the insert.
+
+        """
+
         # enforce types
         checks.check_types(table, str)
         checks.check_types(items, dict)
@@ -232,6 +268,7 @@ class DatasetDatabase(object):
             id = self.database.table(table).insert_get_id(items,
                 sequence=(table + "Id"))
         except Exception as e:
+            print(e)
             checks.check_ingest_error(e)
 
         # get row
@@ -256,6 +293,166 @@ class DatasetDatabase(object):
     def _create_dataset(self, iotas: list) -> dict:
         return {}
 
+
+    def get_or_create_user(self,
+                           name: Union[str, None] = None,
+                           description: Union[str, None] = None) -> dict:
+
+        # enforce types
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(description, [str, type(None)])
+
+        # get name
+        if name is None:
+            name = self.user
+
+        # create or get user
+        user_info = self.get_items_from_table("User", ["Name", "=", name])
+        if len(user_info) == 0:
+            user_info = self.insert_to_table("User",
+                            {"Name": name,
+                             "Description": description,
+                             "Created": datetime.now()})
+        else:
+            user_info = user_info[0]
+
+        return user_info
+
+
+    def get_or_create_algorithm(self,
+                                algorithm: types.MethodType,
+                                name: Union[str, None],
+                                description: Union[str, None],
+                                version: Union[str, None]) -> dict:
+
+        # enforce types
+        checks.check_types(algorithm, types.MethodType)
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(description, [str, type(None)])
+        checks.check_types(version, [str, type(None)])
+
+        # get name
+        if name is None:
+            standard_begin = "<module '"
+            m_name = str(inspect.getmodule(algorithm))
+            m_start = m_name.index(standard_begin) + len(standard_begin)
+            m_name = m_name[m_start:]
+            standard_split = "' from '"
+            m_end = m_name.index(standard_split)
+            m_name = m_name[:m_end]
+            f_name = algorithm.__name__
+
+            name = m_name + "." + f_name
+
+        if version is None:
+            git_dir = os.path.dirname(os.path.abspath(__file__))
+            hash = subprocess.check_output(
+                ["git", "rev-list", "-1", "HEAD", "./"], cwd=git_dir).strip()
+            hash = hash.decode("utf-8")
+
+            assert len(hash) > 0, "Algorithm version could not be determined."
+            version = hash
+
+        # get or create alg
+        alg_info = self.get_items_from_table("Algorithm",
+            [["Name", "=", name], ["Version", "=", version]])
+        if len(alg_info) == 0:
+            alg_info = self.insert_to_table("Algorithm",
+            {"Name": name,
+             "Description": description,
+             "Version": version,
+             "Created": datetime.now()})
+        else:
+            alg_info = alg_info[0]
+
+        return alg_info
+
+
+    def process_run(self,
+                    algorithm: types.MethodType,
+                    input_dataset_id: Union[int, None] = None,
+                    input_dataset_name: Union[str, None] = None,
+                    set_algorithm_name: Union[str, None] = None,
+                    set_algorithm_description: Union[str, None] = None,
+                    set_algorithm_version: Union[str, None] = None,
+                    name: Union[str, None] = None,
+                    description: Union[str, None] = None,
+                    alg_parameters: dict = {}) -> dict:
+
+        # enforce types
+        checks.check_types(input_dataset_id, [int, type(None)])
+        checks.check_types(input_dataset_name, [str, type(None)])
+        checks.check_types(algorithm, types.MethodType)
+        checks.check_types(set_algorithm_name, [str, type(None)])
+        checks.check_types(set_algorithm_description, [str, type(None)])
+        checks.check_types(set_algorithm_version, [str, type(None)])
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(description, [str, type(None)])
+        checks.check_types(alg_parameters, dict)
+
+        # enforce that alg_parameters doesn't contain key input_dataset
+        assert "input_dataset" not in alg_parameters, \
+            "input_dataset is automatically added to alg parameters."
+
+        # get dataset if provided
+        input = None
+        if input_dataset_id is not None:
+            input = self.get_dataset(input_dataset_id)
+        elif input_dataset_name is not None:
+            input_dataset_id = self.get_items_from_table["Dataset",
+                ["Name", "=", input_dataset_name]][0]["DatasetId"]
+            input = self.get_dataset(name=input_dataset_name)
+
+        # create alg info before run
+        alg_info = self.get_or_create_algorithm(algorithm,
+                                                set_algorithm_name,
+                                                set_algorithm_description,
+                                                set_algorithm_version)
+
+        # update description
+        if description is None:
+            description = "{a} run for {u}".format(a=alg_info["Name"],
+                                                   u=self.user)
+
+        # create user info before run
+        user_info = self.get_or_create_user(self.user)
+
+        # begin time
+        begin = datetime.now()
+
+        # use the dataset passed
+        alg_parameters["input_dataset"] = input
+        output_dataset_info = algorithm(alg_parameters)
+
+        # end time
+        end = datetime.now()
+
+        # insert run info
+        run_info = self.insert_to_table("Run",
+                                        {"AlgorithmId": alg_info["AlgorithmId"],
+                                         "UserId": user_info["UserId"],
+                                         "Name": name,
+                                         "Description": description,
+                                         "Begin": begin,
+                                         "End": end})
+        run_id = run_info["RunId"]
+
+        # insert run input
+        if input_dataset_id is not None:
+            self.insert_to_table("RunInput",
+                                 {"RunId": run_id,
+                                  "DatasetId": input_dataset_id,
+                                  "Created": datetime.now()})
+
+        # insert run output
+        self.insert_to_table("RunOutput",
+                             {"RunId": run_id,
+                              "DatasetId": output_dataset_info["DatasetId"],
+                              "Created": datetime.now()})
+
+
+
+        return output_dataset_info
 
     def upload_dataset(self,
                        dataset: Union[str, pathlib.Path, pd.DataFrame],
@@ -302,15 +499,43 @@ class DatasetDatabase(object):
         if len(found_ds) > 0:
             return found_ds[0]
 
+        # create the params object to be passed all the way to the private func
+        params = {}
+        params["dataset"] = dataset
+        params["name"] = name
+        params["description"] = description
+        params["type_map"] = type_map
+        params["value_validation_map"] = value_validation_map
+        params["import_as_type_map"] = import_as_type_map
+        params["store_files"] = store_files
+        params["filepath_columns"] = filepath_columns
+        params["replace_paths"] = replace_paths
+        params["file_id"] = file_id
+
+        # run upload
+        ds_info = self.process_run(algorithm=self._upload_dataset,
+                                   alg_parameters=params)
+
+        return ds_info
+
+
+    def _upload_dataset(self, params) -> dict:
+        # unpack values
+        dataset = params["dataset"]
+        name = params["name"]
+        description = params["description"]
+        type_map = params["type_map"]
+        value_validation_map = params["value_validation_map"]
+        import_as_type_map = params["import_as_type_map"]
+        store_files = params["store_files"]
+        filepath_columns = params["filepath_columns"]
+        replace_paths = params["replace_paths"]
+        file_id = params["file_id"]
+
         # read dataset
         if isinstance(dataset, pathlib.Path):
             dataset = pd.read_csv(dataset)
 
-        # prep items for run ingest
-        fname = inspect.currentframe().f_code.co_name
-        alg_info = self.get_items_from_table("Algorithm",
-                            [["Name", "=", fname],
-                             ["Version", "=", __version__]])[0]
         source_type_info = self.get_items_from_table("SourceType",
                             ["Name", "=", "FileSource"])[0]
 
@@ -333,6 +558,7 @@ class DatasetDatabase(object):
                              "Created": datetime.now()})
         else:
             source_info = source_info[0]
+        source_id = source_info["SourceId"]
 
         # create or get file source
         file_source_info = self.get_items_from_table("FileSource",
@@ -343,14 +569,6 @@ class DatasetDatabase(object):
                              "FileId": file_id})
         else:
             file_source_info = file_source_info[0]
-
-        # items
-        input_dataset_id = None
-        source_id = source_info["SourceId"]
-        alg_id = alg_info["AlgorithmId"]
-        user_id = user_info["UserId"]
-        run_name = "dataset ingestion"
-        desc = "{f} for {n}".format(f=fname, n=name)
 
         # begin run
         begin = datetime.now()
@@ -423,9 +641,6 @@ class DatasetDatabase(object):
                                      start_time=start_time,
                                      total=total_upload)
 
-        # iota created, create junction items
-        print("\nCreating Junction Items...")
-
         # create dataset
         dataset_info = self.insert_to_table("Dataset",
             {"Name": name,
@@ -433,6 +648,9 @@ class DatasetDatabase(object):
              "SourceId": source_id,
              "Created": datetime.now()})
         output_dataset_id = dataset_info["DatasetId"]
+
+        # iota created, create junction items
+        print("\nCreating Junction Items...")
 
         # start new progress bar
         current_i = 0
@@ -460,20 +678,6 @@ class DatasetDatabase(object):
 
         # end run
         end = datetime.now()
-
-        # process run
-        print("\n\n")
-
-        print("RUN INFO:")
-        print("-" * 80)
-        print("In:\t", input_dataset_id)
-        print("Out:\t", output_dataset_id)
-        print("Alg:\t", alg_id)
-        print("User:\t", user_id)
-        print("Name:\t", run_name)
-        print("Desc:\t", desc)
-        print("Begin:\t", begin)
-        print("End:\t", end)
 
         return dataset_info
 
