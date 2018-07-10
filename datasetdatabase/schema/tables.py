@@ -18,7 +18,7 @@ def create_User(schema: orator.Schema):
             table.increments("UserId")
             table.string("Name", 50).unique()
             table.string("Description").nullable()
-            table.datetime("Created").nullable()
+            table.datetime("Created")
 
 
 def create_Iota(schema: orator.Schema):
@@ -29,13 +29,56 @@ def create_Iota(schema: orator.Schema):
     if not schema.has_table("Iota"):
         with schema.create("Iota") as table:
             table.increments("IotaId")
-            table.string("SourceId")
             table.integer("GroupId")
             table.string("Key", 50)
             table.string("Value")
             table.string("ValueType")
             table.datetime("Created")
-            table.unique(["SourceId", "GroupId", "Key"])
+            table.unique(["GroupId", "Key"])
+
+
+def create_SourceType(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("SourceType"):
+        with schema.create("SourceType") as table:
+            table.increments("SourceTypeId")
+            table.string("Name", 50).unique()
+            table.string("Description").nullable()
+            table.datetime("Created")
+
+
+def create_Source(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("Source"):
+        with schema.create("Source") as table:
+            table.increments("SourceId")
+            table.integer("SourceTypeId")
+            table.string("Name").unique()
+            table.datetime("Created")
+            table.foreign("SourceTypeId") \
+                 .references("SourceTypeId") \
+                 .on("SourceType")
+
+
+def create_FileSource(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("FileSource"):
+        with schema.create("FileSource") as table:
+            table.increments("FileSourceId")
+            table.integer("SourceId")
+            table.string("FileId").unique()
+            table.foreign("SourceId") \
+                 .references("SourceId") \
+                 .on("Source")
 
 
 def create_Dataset(schema: orator.Schema):
@@ -48,7 +91,11 @@ def create_Dataset(schema: orator.Schema):
             table.increments("DatasetId")
             table.string("Name").unique()
             table.string("Description").nullable()
+            table.integer("SourceId")
             table.datetime("Created")
+            table.foreign("SourceId") \
+                 .references("SourceId") \
+                 .on("Source")
 
 
 def create_IotaDatasetJunction(schema: orator.Schema):
@@ -100,8 +147,9 @@ def create_Run(schema: orator.Schema):
             table.string("Description").nullable()
             table.datetime("Begin")
             table.datetime("End")
+            table.unique(["InputDatasetId", "AlgorithmId"])
             table.foreign("InputDatasetId") \
-                 .references("DatasetId") \
+                 .references("InputDatasetId") \
                  .on("Dataset")
             table.foreign("OutputDatasetId") \
                  .references("DatasetId") \
@@ -112,3 +160,20 @@ def create_Run(schema: orator.Schema):
             table.foreign("UserId") \
                  .references("UserId") \
                  .on("User")
+
+def create_RunSource(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("RunSource"):
+        with schema.create("RunSource") as table:
+            table.increments("RunSourceId")
+            table.integer("SourceId")
+            table.integer("RunId")
+            table.foreign("SourceId") \
+                 .references("SourceId") \
+                 .on("Source")
+            table.foreign("RunId") \
+                 .references("RunId") \
+                 .on("Run")

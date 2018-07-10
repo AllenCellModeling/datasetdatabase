@@ -2,6 +2,7 @@
 
 # installed
 from typing import Union
+import pandas as pd
 import pathlib
 import getpass
 import types
@@ -265,11 +266,11 @@ def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
     Example
     ==========
     ```
-    >>> e = QueryException("SQL: INSERT INTO...")
+    >>> e = QueryException("SQL: ...")
     >>> check_ingest_error(e)
     True
 
-    >>> e = QueryException("SQL: INSERT INTO...")
+    >>> e = QueryException("SQL: ...")
     >>> check_ingest_error(e)
     TypeError:
 
@@ -288,7 +289,7 @@ def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
     ==========
     e: Exception
         An error that needs to be checked for ingestion error.
-        
+
     err: str
         An additional error message to be displayed before the standard error
         should the provided variable not pass type checks.
@@ -317,3 +318,46 @@ def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
 
     # raise error
     raise TypeError(err.format(e=e))
+
+
+def validate_dataset_types(dataset: pd.DataFrame,
+                     type_map: Union[dict, None] = None,
+                     filepath_columns: Union[str, list, None] = None):
+    # enforce types
+    check_types(dataset, pd.DataFrame)
+    check_types(type_map, [dict, type(None)])
+    check_types(filepath_columns, [str, list, type(None)])
+
+    # convert types
+    if isinstance(filepath_columns, str):
+        filepath_columns = [filepath_columns]
+
+    # enforce data types
+    if type_map is not None or \
+        filepath_columns is not None:
+        for i, row in dataset.iterrows():
+            for key, value in dict(row).items():
+                if type_map is not None:
+                    if key in type_map:
+                        check_types(value, type_map[key])
+
+                if filepath_columns is not None:
+                    if key in filepath_columns:
+                        check_file_exists(pathlib.Path(value))
+
+
+def validate_dataset_values(dataset: pd.DataFrame,
+                            validation_map: Union[dict, None]):
+    # enforce types
+    check_types(dataset, pd.DataFrame)
+    check_types(validation_map, [dict, type(None)])
+
+    # standard error
+    err = "Dataset failed data check at:\n\tcol:{k}\n\trow:{i}\n\tvalue:{v}"
+
+    # enforce all dataset values to meet the lambda requirements
+    if validation_map is not None:
+        for i, row in dataset.iterrows():
+            for k, v in dict(row).items():
+                if k in validation_map:
+                    assert validation_map[k](v), err.format(k=k, i=i, v=v)

@@ -13,10 +13,14 @@ from ..utils import checks
 # CREATION ORDER OF TABLES MATTERS
 TABLES = {"User": tables.create_User,
           "Iota": tables.create_Iota,
+          "SourceType": tables.create_SourceType,
+          "Source": tables.create_Source,
+          "FileSource": tables.create_FileSource,
           "Dataset": tables.create_Dataset,
           "IotaDatasetJunction": tables.create_IotaDatasetJunction,
           "Algorithm": tables.create_Algorithm,
-          "Run": tables.create_Run}
+          "Run": tables.create_Run,
+          "RunSource": tables.create_RunSource}
 
 
 def create_schema(db):
@@ -36,16 +40,29 @@ def drop_schema(db):
 def add_basic_info(db):
     now = datetime.now()
 
+    # add SourceType
+    try:
+        db.database.table("SourceType").insert([
+            {"Name": "FileSource",
+             "Description": "Id attached should be read using FMS get.",
+             "Created": now},
+            {"Name": "RunSource",
+             "Description": "Id attached should be read using dataset get.",
+             "Created": now}
+        ])
+    except Exception as e:
+        checks.check_ingest_error(e)
+
     # add dsdb Algorithms
     try:
         db.database.table("Algorithm").insert([
             {"Name": "upload_dataset",
              "Version": __version__,
-             "Description": "standard dsdb ingest function",
+             "Description": "DatasetDatabase ingest function",
              "Created": now},
             {"Name": "create_dataset",
              "Version": __version__,
-             "Description": "standard dsdb create function",
+             "Description": "DatasetDatabase create function",
              "Created": now}
         ])
     except Exception as e:

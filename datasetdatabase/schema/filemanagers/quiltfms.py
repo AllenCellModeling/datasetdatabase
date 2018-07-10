@@ -43,8 +43,7 @@ def get_or_create_fileid(filepath: Union[str, pathlib.Path]) -> str:
                                     _file_as_blockiter(open(filepath, "rb")),
                                     hashlib.md5(),
                                     True)
-
-    package_name = "fms_" + filepath.suffix + "_" + package_name
+    package_name = "fms_" + package_name
 
     # check fileid exists
     quilt_store = quilt.tools.store.PackageStore()
@@ -52,9 +51,8 @@ def get_or_create_fileid(filepath: Union[str, pathlib.Path]) -> str:
 
     # not found, build the package
     if found_pkg is None:
-        tools.block_print()
-        _build_file_as_package(filepath, package_name)
-        tools.enable_print()
+        with tools.suppress_prints():
+            _build_file_as_package(filepath, package_name)
 
     return package_name
 
@@ -99,7 +97,8 @@ def _build_file_as_package(filepath: pathlib.Path, package_name: str):
     os.remove(temp_write_loc)
 
 
-# this hashing function is pulled from https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file#answer-3431835
+# this hashing function is pulled from:
+# https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file#answer-3431835
 # addressing concerns:
 # these hexdigests will only be used as unique file ids to detect if a file is
 # new or not, no security issues
