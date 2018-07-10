@@ -229,7 +229,7 @@ class DatasetDatabase(object):
                        type_map: Union[dict, None] = None,
                        value_validation_map: Union[dict, None] = None,
                        import_as_type_map: bool = False,
-                       upload_files: bool = False,
+                       store_files: bool = True,
                        filepath_columns: Union[str, list, None] = None,
                        replace_paths: Union[dict, None] = UNIX_REPLACE) -> dict:
 
@@ -240,7 +240,7 @@ class DatasetDatabase(object):
         checks.check_types(type_map, [dict, type(None)])
         checks.check_types(value_validation_map, [dict, type(None)])
         checks.check_types(import_as_type_map, bool)
-        checks.check_types(upload_files, bool)
+        checks.check_types(store_files, bool)
         checks.check_types(filepath_columns, [str, list, type(None)])
         checks.check_types(replace_paths, dict)
 
@@ -329,7 +329,7 @@ class DatasetDatabase(object):
                                           filepath_columns,
                                           replace_paths)
 
-        if upload_files:
+        if store_files:
             # TODO:
             # get duplication size
             # verify duplication size w/ user
@@ -346,7 +346,7 @@ class DatasetDatabase(object):
         iota = {}
         current_i = 0
         start_time = time.time()
-        total_upload = len(dataset)
+        total_upload = (len(dataset) * len(dataset.columns))
         for groupid, row in dataset.iterrows():
             # update progress
             tools.print_progress(count=current_i,
@@ -381,11 +381,12 @@ class DatasetDatabase(object):
                 iota_info = self.insert_to_table("Iota", to_add)
                 iota[iota_info["IotaId"]] = to_add
 
-            # update progress
-            current_i += 1
-            tools.print_progress(count=current_i,
-                                 start_time=start_time,
-                                 total=total_upload)
+
+                # update progress
+                current_i += 1
+                tools.print_progress(count=current_i,
+                                     start_time=start_time,
+                                     total=total_upload)
 
         # iota created, create junction items
         print("\nCreating Junction Items...")
@@ -441,23 +442,30 @@ class DatasetDatabase(object):
         return
 
 
-    def __str__(self):
-        disp = (("-" * 31) + " DATASET DATABASE " + ("-" * 31))
+    def _deep_print(self):
+        print(("-" * 31) + " DATASET DATABASE " + ("-" * 31))
 
         for name, tbl in self.tables.items():
-            disp += ("\n" + ("-" * 80))
+            print("-" * 80)
 
-            disp += ("\n" + name + ":")
+            print(name + ":")
             if isinstance(tbl, orator.query.builder.QueryBuilder):
-                disp += "\n\trows: {r}".format(r=tbl.count())
-                disp += "\n\texample: {r}".format(r=tbl.first())
+                print("rows: {r}".format(r=tbl.count()))
+                print("example: {r}".format(r=tbl.first()))
             else:
-                disp += "\n\t{t}".format(t=type(tbl))
+                print("{t}".format(t=type(tbl)))
 
-        disp += ("\n" + ("-" * 32) + " RECENTLY ADDED " + ("-" * 32))
-        disp += ("\n" + ("-" * 80))
+        print(("-" * 32) + " RECENTLY ADDED " + ("-" * 32))
+        print("-" * 80)
         for row in self.recent:
-            disp += "\n{r}".format(r=row)
+            print("{r}".format(r=row))
+
+
+    def __str__(self):
+        disp = "Recent Datasets:"
+        for row in self.recent:
+            if "DatasetId" in row:
+                disp += "\n{r}".format(r=row)
 
         return disp
 
