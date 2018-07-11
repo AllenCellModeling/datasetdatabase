@@ -30,29 +30,59 @@ def set_storage_location(storage_path: Union[str, pathlib.Path, None] = None):
     os.environ["QUILT_PACKAGE_DIRS"] = storage_path
 
 
-def get_or_create_fileid(filepath: Union[str, pathlib.Path]) -> str:
+def get_hash(filepath: Union[str, pathlib.Path]) -> str:
     # enforce types
     checks.check_types(filepath, [str, pathlib.Path])
     checks.check_file_exists(filepath)
 
-    # convert filepath
-    filepath = pathlib.Path(filepath)
-
     # construct package_name
-    package_name = _hash_bytestr_iter(
-                                    _file_as_blockiter(open(filepath, "rb")),
-                                    hashlib.md5(),
-                                    True)
-    package_name = "fms_" + filepath.suffix[1:] + "_" + package_name
+    hash = _hash_bytestr_iter(_file_as_blockiter(open(filepath, "rb")),
+                              hashlib.md5(),
+                              True)
+    return hash
 
-    # check fileid exists
+
+def get_fileid(filepath: Union[str, pathlib.Path],
+               hash: Union[str, None] = None) -> Union[str, None]:
+    # enforce types
+    checks.check_types(filepath, [str, pathlib.Path])
+    checks.check_types(hash, [str, type(None)])
+
+    # hash just needs to be attached to package naming
+    if hash is not None:
+        package_name = "fms_" + filepath.suffix[1:] + "_" + hash
+    else:
+        hash = get_hash(filepath)
+        package_name = "fms_" + filepath.suffix[1:] + "_" + hash
+
+    # check exists
     quilt_store = quilt.tools.store.PackageStore()
     found_pkg = quilt_store.find_package(None, STORAGE_USER, package_name)
 
-    # not found, build the package
+    # return None or package name
     if found_pkg is None:
-        with tools.suppress_prints():
-            _build_file_as_package(filepath, package_name)
+        return None
+
+    return package_name
+
+def get_or_create_fileid(filepath: Union[str, pathlib.Path]) -> str:
+    # enforce types
+    checks.check_types(filepath, [str, pathlib.Path, type(None)])
+    checks.check_file_exists(filepath)
+
+    # convert types
+    filepath = pathlib.Path(filepath)
+
+    # check exists
+    hash = get_hash(filepath)
+    file_id = get_fileid(filepath, hash)
+    if file_id is not None:
+        return file_id
+
+    # package name standard
+    package_name = "fms_" + filepath.suffix[1:] + "_" + hash
+    with tools.suppress_prints():
+        _build_file_as_package(filepath, package_name)
 
     return package_name
 

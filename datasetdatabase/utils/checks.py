@@ -187,8 +187,8 @@ def check_file_exists(f: Union[str, pathlib.Path],
     raise FileNotFoundError(err.format(f=f))
 
 
-def check_user(user: Union[str, None] = None, err: str = CHECK_USER_ERR) -> \
-    Union[str, ValueError]:
+def check_user(user: Union[str, None] = None,
+               err: str = CHECK_USER_ERR) -> Union[str, ValueError]:
     """
     Check or get the username for approval.
 
@@ -258,8 +258,8 @@ def check_user(user: Union[str, None] = None, err: str = CHECK_USER_ERR) -> \
     return user
 
 
-def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
-    -> Union[bool, TypeError]:
+def check_ingest_error(e: Exception,
+                       err: str = CHECK_INGEST_ERR) -> Union[bool, TypeError]:
     """
     Check the provided exception and enforce that it was an ingestion error.
 
@@ -313,8 +313,8 @@ def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
         return True
 
     # format error
-    if CHECK_FILE_EXISTS_ERR not in err:
-        err += CHECK_FILE_EXISTS_ERR
+    if CHECK_INGEST_ERR not in err:
+        err += CHECK_INGEST_ERR
 
     # raise error
     raise TypeError(err.format(e=e))

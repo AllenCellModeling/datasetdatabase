@@ -493,6 +493,30 @@ class DatasetDatabase(object):
         # get file_id
         if isinstance(dataset, pd.DataFrame):
             ds_path = tools.create_pickle_file(dataset)
+            hash = self.fms.get_hash(ds_path)
+            file_id = self.fms.get_fileid(ds_path, hash)
+        else:
+            hash = self.fms.get_hash(dataset)
+            file_id = self.fms.get_fileid(dataset, hash)
+
+        # return if exists
+        if file_id is not None:
+            found_ds = dict(self.database.table("Dataset")\
+             .join("Source", "Dataset.SourceId", "=", "Source.SourceId")\
+             .join("FileSource", "FileSource.SourceId", "=", "Source.SourceId")\
+             .where("FileId", "=", file_id).get()[0])
+
+            ds_id_cond = ["DatasetId", "=", found_ds["DatasetId"]]
+            found_ds = self.get_items_from_table("Dataset", ds_id_cond)[0]
+
+            # remove the created pickle
+            if isinstance(dataset, pd.DataFrame):
+                os.remove(ds_path)
+
+            return found_ds
+
+        # create if not
+        if isinstance(dataset, pd.DataFrame):
             file_id = self.fms.get_or_create_fileid(ds_path)
             os.remove(ds_path)
         else:
@@ -501,11 +525,6 @@ class DatasetDatabase(object):
         # check dataset name
         if name is None:
             name = file_id
-
-        # return if dataset already exists
-        found_ds = self.get_items_from_table("Dataset", ["Name", "=", name])
-        if len(found_ds) > 0:
-            return found_ds[0]
 
         # create the params object to be passed all the way to the private func
         params = {}
