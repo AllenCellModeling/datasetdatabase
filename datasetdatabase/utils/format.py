@@ -36,7 +36,7 @@ def format_dataset(dataset: pd.DataFrame,
 def format_path(fp: str, replace_items: dict) -> str:
     # enforce types
     checks.check_types(fp, str)
-    checks.check_types(replace_path, dict)
+    checks.check_types(replace_items, dict)
 
     # keep replacing until no changes remain
     for cur, new in replace_items.items():
@@ -55,7 +55,7 @@ def format_paths(dataset: pd.DataFrame,
 
     # early return
     if filepath_columns is None or \
-       replace_path is None:
+       replace_paths is None:
         return dataset
 
     # convert types
@@ -64,6 +64,6 @@ def format_paths(dataset: pd.DataFrame,
 
     # apply changes
     dataset[filepath_columns] = dataset[filepath_columns] \
-                .applymap(lambda fp: change_path(fp))
+                .applymap(lambda fp: format_path(fp, replace_paths))
 
     return dataset

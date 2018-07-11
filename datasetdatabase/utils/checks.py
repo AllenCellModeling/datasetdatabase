@@ -309,7 +309,7 @@ def check_ingest_error(e: Exception, err: str = CHECK_INGEST_ERR) \
     # enforce types
     check_types(err, str)
 
-    if "SQL: INSERT INTO" in str(e):
+    if "UNIQUE constraint failed:" in str(e):
         return True
 
     # format error

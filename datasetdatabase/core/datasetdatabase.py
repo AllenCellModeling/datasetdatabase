@@ -40,7 +40,7 @@ class DatasetDatabase(object):
                  user: Union[str, None] = None,
                  version: types.ModuleType = minimal,
                  fms: types.ModuleType = quiltfms,
-                 cache_size: int = 10):
+                 cache_size: int = 5):
         """
         Create a DatasetDatabase connection.
 
@@ -126,7 +126,7 @@ class DatasetDatabase(object):
             self.construct_tables(self.schema_version)
 
         # recent since connection made
-        self.recent = []
+        self.recent = {table: [] for table in self.tables}
 
 
     def construct_tables(self, version: types.ModuleType = minimal):
@@ -263,25 +263,33 @@ class DatasetDatabase(object):
         checks.check_types(table, str)
         checks.check_types(items, dict)
 
+        # create conditions
+        conditions = []
+        for k, v in items.items():
+            if not isinstance(v, datetime):
+                if v is not None:
+                    conditions.append([k, "=", v])
+
         # try catch ingest
         try:
             id = self.database.table(table).insert_get_id(items,
                 sequence=(table + "Id"))
+            info = self.get_items_from_table(table, [table + "Id", "=", id])[0]
         except Exception as e:
-            print(e)
             checks.check_ingest_error(e)
+            info = self.get_items_from_table(table, conditions)
 
         # get row
-        info = self.get_items_from_table(table, [table + "Id", "=", id])[0]
+
 
         # format row
         if self.driver == "postgresql":
             info = dict(info)
 
         # update recent
-        self.recent.append(info)
-        if len(self.recent) > self.cache_size:
-            self.recent = self.recent[1:]
+        self.recent[table].append(info)
+        if len(self.recent[table]) > self.cache_size:
+            self.recent[table] = self.recent[table][1:]
 
         return info
 
@@ -484,7 +492,7 @@ class DatasetDatabase(object):
 
         # get file_id
         if isinstance(dataset, pd.DataFrame):
-            ds_path = tools.create_parquet_file(dataset)
+            ds_path = tools.create_pickle_file(dataset)
             file_id = self.fms.get_or_create_fileid(ds_path)
             os.remove(ds_path)
         else:
@@ -570,18 +578,39 @@ class DatasetDatabase(object):
         else:
             file_source_info = file_source_info[0]
 
-        # begin run
-        begin = datetime.now()
+        # begin checks
+        print("Validating Dataset...")
+        current_i = 0
+        start_time = time.time()
+        total_upload = (len(dataset) * len(dataset.columns) * 4)
 
-        # preprocess prep dataset
+        # update progress
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
+
+        # format types
         if import_as_type_map:
             dataset = format.format_dataset(dataset, type_map)
+
+        current_i += (len(dataset) * len(dataset.columns))
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
+
+        # format paths
         if filepath_columns is not None or \
            replace_paths is not None:
             dataset = format.format_paths(dataset,
                                           filepath_columns,
                                           replace_paths)
 
+        current_i += (len(dataset) * len(dataset.columns))
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
+
+        # store files
         if store_files:
             # TODO:
             # get duplication size
@@ -589,12 +618,22 @@ class DatasetDatabase(object):
             # store objects
             pass
 
-        # validate dataset
+        # validate types
         checks.validate_dataset_types(dataset, type_map, filepath_columns)
+        current_i += (len(dataset) * len(dataset.columns))
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
+
+        # validate values
         checks.validate_dataset_values(dataset, value_validation_map)
+        current_i += (len(dataset) * len(dataset.columns))
+        tools.print_progress(count=current_i,
+                             start_time=start_time,
+                             total=total_upload)
 
         # begin iota creation
-        print("Creating Iota...")
+        print("\nCreating Iota...")
 
         iota = {}
         current_i = 0
@@ -676,8 +715,7 @@ class DatasetDatabase(object):
                                  start_time=start_time,
                                  total=total_upload)
 
-        # end run
-        end = datetime.now()
+        print("\nDataset upload complete!")
 
         return dataset_info
 
@@ -688,28 +726,21 @@ class DatasetDatabase(object):
     def _deep_print(self):
         print(("-" * 31) + " DATASET DATABASE " + ("-" * 31))
 
-        for name, tbl in self.tables.items():
+        for table, items in self.recent.items():
             print("-" * 80)
 
-            print(name + ":")
-            if isinstance(tbl, orator.query.builder.QueryBuilder):
-                print("rows: {r}".format(r=tbl.count()))
-                print("example: {r}".format(r=tbl.first()))
-            else:
-                print("{t}".format(t=type(tbl)))
-
-        print(("-" * 32) + " RECENTLY ADDED " + ("-" * 32))
-        print("-" * 80)
-        for row in self.recent:
-            print("{r}".format(r=row))
+            print(table + ":")
+            print("rows: {r}".format(r=self.tables[table].count()))
+            print("recent:")
+            for r in self.recent[table]:
+                print(r)
 
 
     def __str__(self):
         disp = "Recent Datasets:"
-        for row in self.recent:
-            if "DatasetId" in row and \
-                "SourceId" in row:
-                disp += "\n{r}".format(r=row)
+        disp += ("\n" + ("-" * 80))
+        for row in self.recent["Dataset"]:
+            disp += "\n{r}".format(r=row)
 
         return disp
 

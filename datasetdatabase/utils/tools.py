@@ -2,11 +2,10 @@
 
 # installed
 from contextlib import contextmanager
-import pyarrow.parquet as pq
 from typing import Union
-import pyarrow as pa
 import pandas as pd
 import pathlib
+import pickle
 import time
 import sys
 import os
@@ -54,16 +53,12 @@ def print_progress(count: int, start_time: float, total: int):
     sys.stdout.flush()
 
 
-def create_parquet_file(table: Union[pa.Table, pd.DataFrame],
+def create_pickle_file(table: pd.DataFrame,
                         path: Union[str, pathlib.Path, None] = None) \
                         -> pathlib.Path:
     # enforce types
-    checks.check_types(table, [pa.Table, pd.DataFrame])
+    checks.check_types(table, pd.DataFrame)
     checks.check_types(path, [str, pathlib.Path, type(None)])
-
-    # convert table
-    if isinstance(table, pd.DataFrame):
-        table = pa.Table.from_pandas(table)
 
     # convert path
     if isinstance(path, type(None)):
@@ -71,9 +66,12 @@ def create_parquet_file(table: Union[pa.Table, pd.DataFrame],
     if isinstance(path, str):
         path = pathlib.Path(path)
 
+    # custom file
     if path.is_dir():
-        path /= "custom_table.parquet"
+        path /= "custom_dataframe.pkl"
 
-    pq.write_table(table, str(path))
+    # dump object
+    with open(str(path), "wb") as write_out:
+        pickle.dump(table, write_out, protocol=2)
 
     return path

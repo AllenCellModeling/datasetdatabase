@@ -169,6 +169,12 @@ class ConnectionManager(object):
                 else:
                     storage = pathlib.Path(local_store)
 
+                # ensure the folders exist
+                try:
+                    os.makedirs(storage.parent)
+                except FileExistsError:
+                    pass
+
                 conn = {config: {
                             "driver": "sqlite",
                             "database": str(storage)}
