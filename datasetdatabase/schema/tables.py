@@ -34,7 +34,7 @@ def create_Iota(schema: orator.Schema):
             table.string("Value")
             table.string("ValueType")
             table.datetime("Created")
-            table.unique(["GroupId", "Key"])
+            table.unique(["GroupId", "Key", "Value", "ValueType"])
 
 
 def create_SourceType(schema: orator.Schema):

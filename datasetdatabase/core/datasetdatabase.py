@@ -25,6 +25,7 @@ from ..utils import tools
 
 # globals
 UNIX_REPLACE = {"\\": "/"}
+DUPLICATE_DATA_CONFIRM = "Duplicate a maximum of {s} of data? (y / n) "
 
 
 class DatasetDatabase(object):
@@ -277,10 +278,7 @@ class DatasetDatabase(object):
             info = self.get_items_from_table(table, [table + "Id", "=", id])[0]
         except Exception as e:
             checks.check_ingest_error(e)
-            info = self.get_items_from_table(table, conditions)
-
-        # get row
-
+            info = self.get_items_from_table(table, conditions)[0]
 
         # format row
         if self.driver == "postgresql":
@@ -470,6 +468,7 @@ class DatasetDatabase(object):
                        value_validation_map: Union[dict, None] = None,
                        import_as_type_map: bool = False,
                        store_files: bool = True,
+                       force_storage: bool = False,
                        filepath_columns: Union[str, list, None] = None,
                        replace_paths: Union[dict, None] = UNIX_REPLACE) -> dict:
 
@@ -481,6 +480,7 @@ class DatasetDatabase(object):
         checks.check_types(value_validation_map, [dict, type(None)])
         checks.check_types(import_as_type_map, bool)
         checks.check_types(store_files, bool)
+        checks.check_types(force_storage, bool)
         checks.check_types(filepath_columns, [str, list, type(None)])
         checks.check_types(replace_paths, dict)
 
@@ -516,6 +516,7 @@ class DatasetDatabase(object):
         params["value_validation_map"] = value_validation_map
         params["import_as_type_map"] = import_as_type_map
         params["store_files"] = store_files
+        params["force_storage"] = force_storage
         params["filepath_columns"] = filepath_columns
         params["replace_paths"] = replace_paths
         params["file_id"] = file_id
@@ -536,6 +537,7 @@ class DatasetDatabase(object):
         value_validation_map = params["value_validation_map"]
         import_as_type_map = params["import_as_type_map"]
         store_files = params["store_files"]
+        force_storage = params["force_storage"]
         filepath_columns = params["filepath_columns"]
         replace_paths = params["replace_paths"]
         file_id = params["file_id"]
@@ -610,14 +612,6 @@ class DatasetDatabase(object):
                              start_time=start_time,
                              total=total_upload)
 
-        # store files
-        if store_files:
-            # TODO:
-            # get duplication size
-            # verify duplication size w/ user
-            # store objects
-            pass
-
         # validate types
         checks.validate_dataset_types(dataset, type_map, filepath_columns)
         current_i += (len(dataset) * len(dataset.columns))
@@ -631,6 +625,29 @@ class DatasetDatabase(object):
         tools.print_progress(count=current_i,
                              start_time=start_time,
                              total=total_upload)
+
+        # store files
+        if filepath_columns is not None and \
+            store_files:
+            if not force_storage:
+                total_size = 0
+                for i, row in dataset[filepath_columns].iterrows():
+                    for item in row:
+                        total_size += os.path.getsize(item)
+                total_size = tools.convert_size(total_size)
+
+                approval = tools.get_yes_no_input(
+                    DUPLICATE_DATA_CONFIRM.format(s=total_size))
+
+                if not approval:
+                    print("Stopping upload...")
+                    return None
+
+            for col in filepath_columns:
+                for i, item in enumerate(dataset[col]):
+                    f_id = self.fms.get_or_create_fileid(item)
+                    dataset.loc[dataset[col][i]] = \
+                        self.fms.get_readpath_from_fileid(f_id)
 
         # begin iota creation
         print("\nCreating Iota...")

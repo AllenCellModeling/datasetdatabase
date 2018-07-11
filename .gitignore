@@ -7,6 +7,7 @@ datasetdatabase.egg-info/
 
 # specific folders
 configs/
+fp_example/
 
 # generated files
 .DS_STORE

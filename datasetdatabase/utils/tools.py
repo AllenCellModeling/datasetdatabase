@@ -7,11 +7,17 @@ import pandas as pd
 import pathlib
 import pickle
 import time
+import math
 import sys
 import os
 
 # self
 from ..utils import checks
+
+# globals
+BYTE_SIZES = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+ALLOWED_YES = ["y", "yes"]
+ALLOWED_NO = ["n", "no"]
 
 
 @contextmanager
@@ -75,3 +81,37 @@ def create_pickle_file(table: pd.DataFrame,
         pickle.dump(table, write_out, protocol=2)
 
     return path
+
+
+def convert_size(size_bytes):
+    """
+    Convert bytes to a more readable size.
+    Credit: https://stackoverflow.com/questions/5194057/better-way-to-convert-file-sizes-in-python#answer-14822210
+    """
+
+    if size_bytes == 0:
+        return "0B"
+
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return "%s %s" % (s, BYTE_SIZES[i])
+
+
+def get_yes_no_input(message: str = "") -> bool:
+    while True:
+        try:
+            answer = str(input(message))
+        except ValueError:
+            print("Sorry, I didn't understand that.")
+            continue
+
+        answer = answer.lower()
+        if answer in (ALLOWED_YES + ALLOWED_NO):
+            if answer in ALLOWED_YES:
+                return True
+
+            return False
+        else:
+            print("Your response must not be one of the following: {a}"\
+                    .format(a=(ALLOWED_YES + ALLOWED_NO)))
