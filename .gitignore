@@ -1,9 +1,12 @@
 # generated folders
-modelingdbtools.egg-info/
 __pycache__/
+local_database/
 .ipynb_checkpoints/
+modelingdbtools.egg-info/
+datasetdatabase.egg-info/
 
 # specific folders
+configs/
 fp_example/
 
 # generated files

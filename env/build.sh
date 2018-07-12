@@ -1,3 +1,3 @@
 #!/bin/sh
 
-docker build -t modeling_db .
+docker build -t datasetdatabase_dev .

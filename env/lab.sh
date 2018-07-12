@@ -1,8 +1,8 @@
 #!/bin/sh
 
 docker run --rm -it \
-    -p 8080:8080 \
+    -p 8888:8888 \
     -e DOCKER_USER="$USER" \
     -v "$(dirname "$PWD")":/active \
     datasetdatabase_dev \
-    bash
+    bash -c "jupyter lab"
