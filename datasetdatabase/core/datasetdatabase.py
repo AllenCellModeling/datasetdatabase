@@ -437,7 +437,8 @@ class DatasetDatabase(object):
                     set_algorithm_version: Union[str, None] = None,
                     name: Union[str, None] = None,
                     description: Union[str, None] = None,
-                    alg_parameters: dict = {}) -> dict:
+                    alg_parameters: dict = {},
+                    dataset_parameters: dict = {}) -> dict:
 
         # enforce types
         checks.check_types(input_dataset_id, [int, type(None)])
@@ -449,6 +450,7 @@ class DatasetDatabase(object):
         checks.check_types(name, [str, type(None)])
         checks.check_types(description, [str, type(None)])
         checks.check_types(alg_parameters, dict)
+        checks.check_types(dataset_parameters, dict)
 
         # enforce that alg_parameters doesn't contain key input_dataset
         assert "input_dataset" not in alg_parameters, \
@@ -459,8 +461,6 @@ class DatasetDatabase(object):
         if input_dataset_id is not None:
             input = self.get_dataset(input_dataset_id)
         elif input_dataset_name is not None:
-            input_dataset_id = self.get_items_from_table["Dataset",
-                ["Name", "=", input_dataset_name]][0]["DatasetId"]
             input = self.get_dataset(name=input_dataset_name)
 
         # create alg info before run
@@ -482,7 +482,14 @@ class DatasetDatabase(object):
 
         # use the dataset passed
         alg_parameters["input_dataset"] = input
-        output_dataset_info = algorithm(alg_parameters)
+        output_dataset = algorithm(alg_parameters)
+
+        # check output
+        checks.check_types(output_dataset, pd.DataFrame)
+
+        # create iota from new dataset
+        dataset_parameters["dataset"] = output_dataset
+        output_dataset_info = self._create_dataset(dataset_parameters)
 
         # end time
         end = datetime.now()
@@ -604,10 +611,16 @@ class DatasetDatabase(object):
         params["file_id"] = file_id
 
         # run upload
-        ds_info = self.process_run(algorithm=self._create_dataset,
-                                   alg_parameters=params)
+        ds_info = self.process_run(algorithm=self._upload_dataset,
+                                   alg_parameters=params,
+                                   dataset_parameters=params)
 
         return ds_info
+
+
+    def _upload_dataset(self, params: dict) -> pd.DataFrame:
+        # just return
+        return params["dataset"]
 
 
     def _create_dataset(self, params) -> dict:
