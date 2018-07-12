@@ -27,6 +27,11 @@ from ..utils import tools
 UNIX_REPLACE = {"\\": "/"}
 DUPLICATE_DATA_CONFIRM = "Duplicate a maximum of {s} of data? (y / n) "
 
+# bad, but until someone tells me how to fix [671]:
+#   dataset[col][i] = self.fms.get_readpath_from_fileid(f_id)
+# i dont know what else to do
+pd.options.mode.chained_assignment = None  # default='warn'
+
 
 class DatasetDatabase(object):
     """
@@ -292,14 +297,6 @@ class DatasetDatabase(object):
         return info
 
 
-    def create_dataset(self, iotas: list) -> dict:
-        return {}
-
-
-    def _create_dataset(self, iotas: list) -> dict:
-        return {}
-
-
     def get_or_create_user(self,
                            name: Union[str, None] = None,
                            description: Union[str, None] = None) -> dict:
@@ -372,6 +369,63 @@ class DatasetDatabase(object):
             alg_info = alg_info[0]
 
         return alg_info
+
+
+    def get_dataset(self,
+                    id: Union[int, None] = None,
+                    name: Union[str, None] = None,
+                    sourceid: Union[int, None] = None,
+                    columns: Union[str, list, None] = None,
+                    get_info_items: bool = False) \
+                    -> Union[pd.DataFrame, KeyError]:
+
+        # enforce types
+        checks.check_types(id, [int, type(None)])
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(sourceid, [int, type(None)])
+        checks.check_types(columns, [str, list, type(None)])
+        checks.check_types(get_info_items, bool)
+
+        # must provide id or name
+        assert id is not None or name is not None or sourceid is not None, \
+            "Must provide dataset id, name, or source id."
+
+        # convert types
+        if isinstance(columns, str):
+            columns = [columns]
+
+        # get merge contents
+        ds = self.database.table("Dataset")
+
+        if id is not None:
+            ds = ds.where("Dataset.DatasetId", "=", id)
+        elif name is not None:
+            ds = ds.where("Dataset.Name", "=", name)
+        else:
+            ds = ds.where("Dataset.SourceId", "=", sourceid)
+
+        # join
+        ds = ds.join("IotaDatasetJunction",
+                     "Dataset.DatasetId", "=", "IotaDatasetJunction.DatasetId")
+        ds = ds.join("Iota",
+                     "Iota.IotaId", "=", "IotaDatasetJunction.IotaId")
+
+        # filter by key
+        if isinstance(columns, list):
+            or_where = database.query()
+            for c in columns:
+                or_where = or_where.where("Key", "=", c)
+
+            ds = ds.or_where(or_where)
+
+        # get
+        ds = ds.get()
+
+        # format
+        ds = format.convert_dataset_to_dataframe(pd.DataFrame(ds.all()),
+                                                 get_info_items)
+
+        return ds
 
 
     def process_run(self,
@@ -460,6 +514,11 @@ class DatasetDatabase(object):
 
         return output_dataset_info
 
+
+    def form_dataset(self, iotas: list) -> dict:
+        return {}
+
+
     def upload_dataset(self,
                        dataset: Union[str, pathlib.Path, pd.DataFrame],
                        name: Union[str, None] = None,
@@ -501,19 +560,23 @@ class DatasetDatabase(object):
 
         # return if exists
         if file_id is not None:
-            found_ds = dict(self.database.table("Dataset")\
-             .join("Source", "Dataset.SourceId", "=", "Source.SourceId")\
-             .join("FileSource", "FileSource.SourceId", "=", "Source.SourceId")\
-             .where("FileId", "=", file_id).get()[0])
+            try:
+                found_ds = dict(self.database.table("Dataset") \
+                 .join("Source", "Dataset.SourceId", "=", "Source.SourceId") \
+                 .join("FileSource",
+                       "FileSource.SourceId", "=", "Source.SourceId") \
+                 .where("FileId", "=", file_id).get()[0])
 
-            ds_id_cond = ["DatasetId", "=", found_ds["DatasetId"]]
-            found_ds = self.get_items_from_table("Dataset", ds_id_cond)[0]
+                ds_id_cond = ["DatasetId", "=", found_ds["DatasetId"]]
+                found_ds = self.get_items_from_table("Dataset", ds_id_cond)[0]
 
-            # remove the created pickle
-            if isinstance(dataset, pd.DataFrame):
-                os.remove(ds_path)
+                # remove the created pickle
+                if isinstance(dataset, pd.DataFrame):
+                    os.remove(ds_path)
 
-            return found_ds
+                return found_ds
+            except IndexError:
+                pass
 
         # create if not
         if isinstance(dataset, pd.DataFrame):
@@ -541,13 +604,13 @@ class DatasetDatabase(object):
         params["file_id"] = file_id
 
         # run upload
-        ds_info = self.process_run(algorithm=self._upload_dataset,
+        ds_info = self.process_run(algorithm=self._create_dataset,
                                    alg_parameters=params)
 
         return ds_info
 
 
-    def _upload_dataset(self, params) -> dict:
+    def _create_dataset(self, params) -> dict:
         # unpack values
         dataset = params["dataset"]
         name = params["name"]
@@ -665,7 +728,7 @@ class DatasetDatabase(object):
             for col in filepath_columns:
                 for i, item in enumerate(dataset[col]):
                     f_id = self.fms.get_or_create_fileid(item)
-                    dataset.loc[dataset[col][i]] = \
+                    dataset[col][i] = \
                         self.fms.get_readpath_from_fileid(f_id)
 
         # begin iota creation
@@ -754,6 +817,7 @@ class DatasetDatabase(object):
         print("\nDataset upload complete!")
 
         return dataset_info
+
 
     def __getitem__(self, key):
         return
