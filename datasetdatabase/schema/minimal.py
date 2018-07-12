@@ -32,11 +32,17 @@ def create_schema(db):
 
 
 def drop_schema(db):
-    drop_order = list(TABLES.keys()).reverse()
+    print(TABLES.keys())
+
+    drop_order = list(TABLES.keys())
+    drop_order.reverse()
 
     for tbl in drop_order:
         db.schema.drop_if_exists(tbl)
-        del db.tables[tbl]
+        try:
+            del db.tables[tbl]
+        except KeyError:
+            pass
 
 
 def add_basic_info(db):

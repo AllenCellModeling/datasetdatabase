@@ -843,10 +843,13 @@ class DatasetDatabase(object):
             print("-" * 80)
 
             print(table + ":")
-            print("rows: {r}".format(r=self.tables[table].count()))
-            print("recent:")
-            for r in self.recent[table]:
-                print(r)
+            try:
+                print("rows: {r}".format(r=self.tables[table].count()))
+                print("recent:")
+                for r in self.recent[table]:
+                    print(r)
+            except KeyError:
+                print("!not built!")
 
 
     def __str__(self):
