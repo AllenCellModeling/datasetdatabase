@@ -309,7 +309,8 @@ def check_ingest_error(e: Exception,
     # enforce types
     check_types(err, str)
 
-    if "UNIQUE constraint failed:" in str(e):
+    if "UNIQUE constraint failed:" in str(e) or \
+        "duplicate key value violates unique constraint" in str(e):
         return True
 
     # format error

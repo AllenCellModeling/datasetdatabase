@@ -358,7 +358,7 @@ class DatasetDatabase(object):
                 hash = hash.strip()
                 hash = hash.decode("utf-8")
             except subprocess.CalledProcessError:
-                hash = "0.0"
+                pass
 
             assert len(hash) > 0, "Algorithm version could not be determined."
             version = hash
@@ -429,7 +429,12 @@ class DatasetDatabase(object):
         ds = ds.get()
 
         # format
-        ds = format.convert_dataset_to_dataframe(pd.DataFrame(ds.all()),
+        if self.driver == "sqlite":
+            ds = pd.DataFrame(ds.all())
+        else:
+            ds = pd.DataFrame([dict(r) for r in ds.all()])
+
+        ds = format.convert_dataset_to_dataframe(ds,
                                                  get_info_items)
 
         return ds
