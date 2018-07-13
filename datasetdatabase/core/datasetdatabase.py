@@ -347,11 +347,18 @@ class DatasetDatabase(object):
 
             name = m_name + "." + f_name
 
+        if "datasetdatabase.datasetdatabase" in name:
+            version = __version__
+
         if version is None:
-            git_dir = os.path.dirname(os.path.abspath(__file__))
-            hash = subprocess.check_output(
-                ["git", "rev-list", "-1", "HEAD", "./"], cwd=git_dir).strip()
-            hash = hash.decode("utf-8")
+            try:
+                git_dir = os.path.dirname(os.path.abspath(__file__))
+                hash = subprocess.check_output(
+                    ["git", "rev-list", "-1", "HEAD", "./"], cwd=git_dir)
+                hash = hash.strip()
+                hash = hash.decode("utf-8")
+            except subprocess.CalledProcessError:
+                hash = "0.0"
 
             assert len(hash) > 0, "Algorithm version could not be determined."
             version = hash
