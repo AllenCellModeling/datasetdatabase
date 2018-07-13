@@ -845,7 +845,10 @@ class DatasetDatabase(object):
 
 
     def __getitem__(self, key):
-        return
+        if isinstance(key, str):
+            return self.database.table(str)
+
+        raise KeyError("Table or item in table is not present in database")
 
 
     def _deep_print(self):
