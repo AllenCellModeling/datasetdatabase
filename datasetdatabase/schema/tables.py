@@ -28,7 +28,7 @@ def create_Iota(schema: orator.Schema):
     # create table
     if not schema.has_table("Iota"):
         with schema.create("Iota") as table:
-            table.increments("IotaId")
+            table.big_increments("IotaId")
             table.integer("GroupId")
             table.string("Key", 50)
             table.string("Value")
@@ -74,8 +74,8 @@ def create_FileSource(schema: orator.Schema):
     if not schema.has_table("FileSource"):
         with schema.create("FileSource") as table:
             table.increments("FileSourceId")
+            table.integer("FileId").unsigned()
             table.integer("SourceId").unsigned()
-            table.string("FileId").unique()
             table.foreign("SourceId") \
                  .references("SourceId") \
                  .on("Source")
@@ -92,6 +92,7 @@ def create_Dataset(schema: orator.Schema):
             table.string("Name").unique()
             table.string("Description").nullable()
             table.integer("SourceId").unsigned()
+            table.string("FilepathColumns").nullable()
             table.datetime("Created")
             table.foreign("SourceId") \
                  .references("SourceId") \

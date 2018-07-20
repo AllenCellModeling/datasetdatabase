@@ -32,8 +32,6 @@ def create_schema(db):
 
 
 def drop_schema(db):
-    print(TABLES.keys())
-
     drop_order = list(TABLES.keys())
     drop_order.reverse()
 

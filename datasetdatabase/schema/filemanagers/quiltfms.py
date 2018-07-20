@@ -3,10 +3,13 @@
 # installed
 from datetime import datetime
 from typing import Union
+import importlib
 import pathlib
 import hashlib
+import orator
 import quilt
 import yaml
+import json
 import os
 
 # self
@@ -15,116 +18,205 @@ from ...utils import tools
 
 # globals
 STORAGE_USER = "dsdb_storage"
+CONNECTION_OPTIONS = {"user": STORAGE_USER, "storage_location": None}
 
 
-def set_storage_location(storage_path: Union[str, pathlib.Path, None] = None):
-    # enforce types
-    checks.check_types(storage_path, [str, pathlib.Path, type(None)])
-    checks.check_file_exists(storage_path)
+class FMS(object):
 
-    # ensure string
-    storage_path = str(storage_path)
+    def __init__(self,
+                 dsdb,
+                 connection_options: Union[dict, None] = None,
+                 build: bool = True):
 
-    # update quilt store
-    os.environ["QUILT_PRIMARY_PACKAGE_DIR"] = storage_path
-    os.environ["QUILT_PACKAGE_DIRS"] = storage_path
+        # enforce types
+        checks.check_types(connection_options, [dict, type(None)])
+        checks.check_types(build, bool)
 
+        # set object attributes
+        self.dsdb = dsdb
 
-def get_hash(filepath: Union[str, pathlib.Path]) -> str:
-    # enforce types
-    checks.check_types(filepath, [str, pathlib.Path])
-    checks.check_file_exists(filepath)
+        # set or merge defaults with provided
+        if connection_options is None:
+            self.connection_options = CONNECTION_OPTIONS
+        else:
+            self.connection_options = {**CONNECTION_OPTIONS,
+                                       **connection_options}
 
-    # construct package_name
-    hash = _hash_bytestr_iter(_file_as_blockiter(open(filepath, "rb")),
-                              hashlib.md5(),
-                              True)
-    return hash
+        # update storage user
+        self.storage_user = self.connection_options["user"]
+        self.set_storage_location(self.connection_options["storage_location"])
 
+        # create tables and connections
+        if build:
+            # create table
+            self.create_File(self.dsdb.schema)
 
-def get_fileid(filepath: Union[str, pathlib.Path],
-               hash: Union[str, None] = None) -> Union[str, None]:
-    # enforce types
-    checks.check_types(filepath, [str, pathlib.Path])
-    checks.check_types(hash, [str, type(None)])
+            # update FileSource relationship
+            with self.dsdb.schema.table("FileSource") as table:
+                table.foreign("FileId") \
+                     .references("FileId") \
+                     .on("File")
 
-    # hash just needs to be attached to package naming
-    if hash is not None:
-        package_name = "fms_" + filepath.suffix[1:] + "_" + hash
-    else:
-        hash = get_hash(filepath)
-        package_name = "fms_" + filepath.suffix[1:] + "_" + hash
-
-    # check exists
-    quilt_store = quilt.tools.store.PackageStore()
-    found_pkg = quilt_store.find_package(None, STORAGE_USER, package_name)
-
-    # return None or package name
-    if found_pkg is None:
-        return None
-
-    return package_name
-
-def get_or_create_fileid(filepath: Union[str, pathlib.Path]) -> str:
-    # enforce types
-    checks.check_types(filepath, [str, pathlib.Path, type(None)])
-    checks.check_file_exists(filepath)
-
-    # convert types
-    filepath = pathlib.Path(filepath)
-
-    # check exists
-    hash = get_hash(filepath)
-    file_id = get_fileid(filepath, hash)
-    if file_id is not None:
-        return file_id
-
-    # package name standard
-    package_name = "fms_" + filepath.suffix[1:] + "_" + hash
-    with tools.suppress_prints():
-        _build_file_as_package(filepath, package_name)
-
-    return package_name
+        # update db recent map
+        self.dsdb.recent["File"] = []
+        self.dsdb.tables["File"] = self.dsdb.database.table("File")
 
 
-def get_readpath_from_fileid(fileid: str) -> pathlib.Path:
-    # enforce types
-    checks.check_types(fileid, str)
+    def create_File(self, schema: orator.Schema):
+        # enforce types
+        checks.check_types(schema, orator.Schema)
 
-    # set full package name and load
-    name = STORAGE_USER + "/" + fileid
-    return quilt.load(name).load()
+        # create table
+        if not schema.has_table("File"):
+            with schema.create("File") as table:
+                table.increments("FileId")
+                table.string("OriginalFilepath")
+                table.string("Filetype").nullable()
+                table.string("ReadPath").unique()
+                table.string("MD5").unique()
+                table.string("QuiltPackage").unique()
+                table.string("Metadata").nullable()
+                table.datetime("Created")
 
 
-################################################################################
-############################## PRIVATE FUNCTIONS ###############################
-################################################################################
+    def set_storage_location(self,
+                             storage_location: Union[str, pathlib.Path, None]):
+        # enforce types
+        checks.check_types(storage_location,
+                           [str, pathlib.Path, type(None)])
+
+        # update quilt store
+        if storage_location is not None:
+            self.storage_location = storage_location
+            checks.check_file_exists(self.storage_location)
+            os.environ["QUILT_PRIMARY_PACKAGE_DIR"] = str(self.storage_location)
+            os.environ["QUILT_PACKAGE_DIRS"] = str(self.storage_location)
 
 
-def _build_file_as_package(filepath: pathlib.Path, package_name: str):
-    # enforce types
-    checks.check_types(filepath, pathlib.Path)
-    checks.check_file_exists(filepath)
+    def get_hash(self, filepath: Union[str, pathlib.Path]) -> str:
+        # enforce types
+        checks.check_types(filepath, [str, pathlib.Path])
+        checks.check_file_exists(filepath)
 
-    # construct manifest
-    load = {}
-    load["file"] = str(filepath)
-    load["transform"] = "id"
-    contents = {"load": load}
-    node = {"contents": contents}
+        # construct package_name
+        hash = _hash_bytestr_iter(_file_as_blockiter(open(filepath, "rb")),
+                                  hashlib.md5(),
+                                  True)
+        return hash
 
-    # write temporary manifest
-    temp_write_loc = pathlib.Path(os.getcwd())
-    temp_write_loc /= "single_file.yml"
-    with open(temp_write_loc, "w") as write_out:
-        yaml.dump(node, write_out, default_flow_style=False)
 
-    # create quilt node
-    full_package_name = STORAGE_USER + "/" + package_name
-    quilt.build(full_package_name, str(temp_write_loc))
+    def get_file(self,
+                   filepath: Union[str, pathlib.Path, None] = None,
+                   readpath: Union[str, pathlib.Path, None] = None,
+                   hash: Union[str, None] = None) -> Union[str, None]:
+        # enforce types
+        checks.check_types(filepath, [str, pathlib.Path, type(None)])
+        checks.check_types(readpath, [str, pathlib.Path, type(None)])
+        checks.check_types(hash, [str, type(None)])
 
-    # remove the temp file
-    os.remove(temp_write_loc)
+        # enforce at least one parameter given
+        assert filepath is not None or \
+               readpath is not None or \
+               hash is not None, \
+            "Provide filepath, an fms provided readpath, or a file hash."
+
+        # try to find the fileid
+        if hash is not None:
+            found = self.dsdb.get_items_from_table("File",
+                                                ["MD5", "=", hash])
+        elif readpath is not None:
+            found = self.dsdb.get_items_from_table("File",
+                                                ["ReadPath", "=", readpath])
+        else:
+            hash = self.get_hash(filepath)
+            found = self.dsdb.get_items_from_table("File",
+                                                ["MD5", "=", hash])
+
+        # try catch exists
+        try:
+            found = found[0]
+        except IndexError:
+            found = None
+
+        return found
+
+
+    def get_or_create_file(self,
+                           filepath: Union[str, pathlib.Path],
+                           metadata: Union[str, dict, None] = None) -> str:
+        # enforce types
+        checks.check_types(filepath, [str, pathlib.Path])
+        checks.check_types(metadata, [str, dict, type(None)])
+
+        # convert types
+        filepath = pathlib.Path(filepath)
+        if isinstance(metadata, dict):
+            metadata = str(dict)
+
+        # check file exists
+        checks.check_file_exists(filepath)
+
+        # check exists
+        hash = self.get_hash(filepath)
+        file_info = self.get_file(hash=hash)
+
+        # return if found
+        if file_info is not None:
+            return file_info
+
+        name = "fms_" + hash
+        # create if not
+        with tools.suppress_prints():
+            pkg = self._build_file_as_package(filepath, name)
+
+        # import string
+        read_pkg = importlib.import_module(name="quilt.data." +
+                                                self.storage_user +
+                                                "." +
+                                                name)
+
+        file_info = self.dsdb.insert_to_table("File",
+                                        {"OriginalFilepath": str(filepath),
+                                         "Filetype": filepath.suffix\
+                                                     .replace(".", ""),
+                                         "ReadPath": read_pkg.load(),
+                                         "MD5": hash,
+                                         "QuiltPackage": pkg,
+                                         "Metadata": metadata,
+                                         "Created": datetime.now()})
+
+        return file_info
+
+
+    def _build_file_as_package(self,
+                               filepath: Union[str, pathlib.Path],
+                               package_name: str) -> str:
+        # enforce types
+        checks.check_types(filepath, [str, pathlib.Path])
+        checks.check_types(package_name, str)
+        checks.check_file_exists(filepath)
+
+        # construct manifest
+        load = {}
+        load["file"] = str(filepath)
+        load["transform"] = "id"
+        contents = {"load": load}
+        node = {"contents": contents}
+
+        # write temporary manifest
+        temp_write_loc = pathlib.Path(os.getcwd())
+        temp_write_loc /= "single_file.yml"
+        with open(temp_write_loc, "w") as write_out:
+            yaml.dump(node, write_out, default_flow_style=False)
+
+        # create quilt node
+        full_package_name = self.storage_user + "/" + package_name
+        quilt.build(full_package_name, str(temp_write_loc))
+
+        # remove the temp file
+        os.remove(temp_write_loc)
+
+        return full_package_name
 
 
 # this hashing function is pulled from:

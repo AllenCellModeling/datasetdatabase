@@ -60,8 +60,8 @@ def print_progress(count: int, start_time: float, total: int):
 
 
 def create_pickle_file(table: pd.DataFrame,
-                        path: Union[str, pathlib.Path, None] = None) \
-                        -> pathlib.Path:
+                       path: Union[str, pathlib.Path, None] = None) \
+                       -> pathlib.Path:
     # enforce types
     checks.check_types(table, pd.DataFrame)
     checks.check_types(path, [str, pathlib.Path, type(None)])
@@ -77,8 +77,7 @@ def create_pickle_file(table: pd.DataFrame,
         path /= "custom_dataframe.pkl"
 
     # dump object
-    with open(str(path), "wb") as write_out:
-        pickle.dump(table, write_out, protocol=2)
+    table.to_pickle(path)
 
     return path
 
@@ -115,3 +114,59 @@ def get_yes_no_input(message: str = "") -> bool:
         else:
             print("Your response must not be one of the following: {a}"\
                     .format(a=(ALLOWED_YES + ALLOWED_NO)))
+
+
+def write_dataset_readme(ds_info: dict,
+                         path: Union[str, pathlib.Path, None] = None) \
+                         -> pathlib.Path:
+    # enforce types
+    checks.check_types(ds_info, dict)
+    checks.check_types(path, [str, pathlib.Path, type(None)])
+
+    # convert types
+    if isinstance(path, str):
+        path = pathlib.Path(path)
+
+    # construct readme
+    # name
+    readme = ""
+    if ds_info["Name"] is not None:
+        readme += "# " + ds_info["Name"] + ":"
+        readme += "\n\n"
+
+    # description
+    if ds_info["Description"] is not None:
+        readme += "## Description:"
+        readme += "\n"
+        readme += ds_info["Description"]
+        readme += "\n\n"
+
+    # created
+    readme += "## Created:"
+    readme += "\n"
+    readme += str(ds_info["Created"])
+    readme += "\n\n"
+
+    # source
+    readme += "## Origin SourceId:"
+    readme += "\n"
+    readme += str(ds_info["SourceId"])
+    readme += "\n\n"
+
+    # create path
+    if path is None:
+        path = os.getcwd()
+        path = pathlib.Path(path)
+        path /= (str(ds_info["SourceId"]) + "_readme.md")
+
+    # ensure dirs
+    try:
+        os.makedirs(path.parent)
+    except FileExistsError:
+        pass
+
+    # dump
+    with open(path, "w") as write_out:
+        write_out.write(readme)
+
+    return path

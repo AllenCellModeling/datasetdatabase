@@ -6,12 +6,16 @@ from typing import Union
 import pandas as pd
 import numpy as np
 import subprocess
+import importlib
 import pathlib
 import inspect
 import getpass
 import orator
+import quilt
 import types
 import time
+import yaml
+import ast
 import os
 
 # self
@@ -46,6 +50,7 @@ class DatasetDatabase(object):
                  user: Union[str, None] = None,
                  version: types.ModuleType = minimal,
                  fms: types.ModuleType = quiltfms,
+                 fms_connection_options: Union[dict, None] = None,
                  cache_size: int = 5):
         """
         Create a DatasetDatabase connection.
@@ -93,9 +98,13 @@ class DatasetDatabase(object):
             How should files be properly stored, versioned, and retrieved.
             Can pass your own modules here for extended fms modules.
             Custom modules must contain functions: set_storage_location,
-            get_or_create_fileid, and get_readpath_from_fileid.
+            get_or_create_file, and get_readpath_from_fileid.
 
             Default: datasetdatabase.schema.filemanagers.quiltfms
+
+        fms_connection_options: dict, None
+            Parameters to be passed to the fms connection module's setup
+            function specified by the above fms parameter.
 
         cache_size: int
             How many items should be stored in the recently created list.
@@ -125,7 +134,6 @@ class DatasetDatabase(object):
         self.schema_version = version
         self.driver = config[list(config.keys())[0]]["driver"]
         self.tables = version.get_tables(self)
-        self.fms = fms
 
         # create tables
         if build:
@@ -133,6 +141,9 @@ class DatasetDatabase(object):
 
         # recent since connection made
         self.recent = {table: [] for table in self.tables}
+
+        # run fms module setup
+        self.fms = fms.FMS(self, fms_connection_options, build)
 
 
     def construct_tables(self, version: types.ModuleType = minimal):
@@ -295,6 +306,23 @@ class DatasetDatabase(object):
             self.recent[table] = self.recent[table][1:]
 
         return info
+
+
+    def upload_files(self, filepaths: Union[str, list]) -> dict:
+
+        # enforce types
+        checks.check_types(filepaths, [str, list])
+
+        # convert types
+        if isinstance(filepaths, str):
+            filepaths = [filepaths]
+
+        # create file info list
+        infos = []
+        for fp in filepaths:
+            infos.append(self.fms.get_or_create_file(fp))
+
+        return infos
 
 
     def get_or_create_user(self,
@@ -568,26 +596,27 @@ class DatasetDatabase(object):
         if isinstance(filepath_columns, str):
             filepath_columns = [filepath_columns]
 
-        # get file_id
+        # get file_info
         if isinstance(dataset, pd.DataFrame):
+            dataset = dataset.copy()
             ds_path = tools.create_pickle_file(dataset)
             hash = self.fms.get_hash(ds_path)
-            file_id = self.fms.get_fileid(ds_path, hash)
+            file_info = self.fms.get_file(filepath=ds_path, hash=hash)
         else:
             hash = self.fms.get_hash(dataset)
-            file_id = self.fms.get_fileid(dataset, hash)
+            file_info = self.fms.get_file(filepath=dataset, hash=hash)
 
         # return if exists
-        if file_id is not None:
+        if file_info is not None:
             try:
-                found_ds = dict(self.database.table("Dataset") \
+                found_ds = self.database.table("Dataset") \
                  .join("Source", "Dataset.SourceId", "=", "Source.SourceId") \
                  .join("FileSource",
                        "FileSource.SourceId", "=", "Source.SourceId") \
-                 .where("FileId", "=", file_id).get()[0])
+                 .where("FileId", "=", file_info["FileId"]).get()[0]
 
-                ds_id_cond = ["DatasetId", "=", found_ds["DatasetId"]]
-                found_ds = self.get_items_from_table("Dataset", ds_id_cond)[0]
+                found_ds = self.get_items_from_table("Dataset",
+                                ["DatasetId", "=", found_ds["DatasetId"]])[0]
 
                 # remove the created pickle
                 if isinstance(dataset, pd.DataFrame):
@@ -599,14 +628,14 @@ class DatasetDatabase(object):
 
         # create if not
         if isinstance(dataset, pd.DataFrame):
-            file_id = self.fms.get_or_create_fileid(ds_path)
+            file_info = self.fms.get_or_create_file(ds_path)
             os.remove(ds_path)
         else:
-            file_id = self.fms.get_or_create_fileid(dataset)
+            file_info = self.fms.get_or_create_file(dataset)
 
         # check dataset name
         if name is None:
-            name = file_id
+            name = "hash_" + file_info["MD5"]
 
         # create the params object to be passed all the way to the private func
         params = {}
@@ -620,7 +649,7 @@ class DatasetDatabase(object):
         params["force_storage"] = force_storage
         params["filepath_columns"] = filepath_columns
         params["replace_paths"] = replace_paths
-        params["file_id"] = file_id
+        params["file_id"] = file_info["FileId"]
 
         # run upload
         ds_info = self.process_run(algorithm=self._upload_dataset,
@@ -628,6 +657,103 @@ class DatasetDatabase(object):
                                    dataset_parameters=params)
 
         return ds_info
+
+
+    def export_to_quilt(self,
+                        id: Union[int, None] = None,
+                        name: Union[str, None] = None,
+                        sourceid: Union[int, None] = None,
+                        columns: Union[str, list, None] = None,
+                        filepath_columns: Union[str, list, None] = None,
+                        get_info_items: bool = False,
+                        quilt_user: str = "dsdb") -> str:
+
+        # enforce types
+        checks.check_types(id, [int, type(None)])
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(sourceid, [int, type(None)])
+        checks.check_types(columns, [str, list, type(None)])
+        checks.check_types(filepath_columns, [str, list, type(None)])
+        checks.check_types(get_info_items, bool)
+        checks.check_types(quilt_user, str)
+
+        # must provide id or name
+        assert id is not None or name is not None or sourceid is not None, \
+            "Must provide dataset id, name, or source id."
+
+        # get info
+        if id is not None:
+            ds_info = self.get_items_from_table("Dataset",
+                                                ["DatasetId", "=", id])
+        elif name is not None:
+            ds_info = self.get_items_from_table("Dataset",
+                                                ["Name", "=", name])
+        else:
+            ds_info = self.get_items_from_table("Dataset",
+                                                ["SourceId", "=", sourceid])
+
+        # first item from return
+        ds_info = ds_info[0]
+
+        # process or get filepath columns
+        if isinstance(filepath_columns, str):
+            filepath_columns = [filepath_columns]
+        if filepath_columns is None:
+            if ds_info["FilepathColumns"] is None:
+                filepath_columns = []
+            else:
+                filepath_columns = ast.literal_eval(ds_info["FilepathColumns"])
+
+        # get dataset
+        dataset = self.get_dataset(id, name, sourceid, columns, get_info_items)
+
+        # create file ids if needed
+        # generate the map of file packages to be added
+        quilt_FMS = quiltfms.FMS(self)
+        packages = {}
+        for col in filepath_columns:
+            for i, item in enumerate(dataset[col]):
+                # ensure quilt package creation of each file needed for upload
+                file_info = quilt_FMS.get_or_create_file(item)
+                file_node_name = (file_info["Filetype"] + "_" +
+                                  str(file_info["FileId"]))
+                packages[file_node_name] = file_info["QuiltPackage"]
+                dataset[col][i] = file_node_name
+
+        # dataset has been parsed
+        ds_path = tools.create_pickle_file(dataset)
+        file_info = quilt_FMS.get_or_create_file(ds_path)
+
+        # create readme
+        readme_path = tools.write_dataset_readme(ds_info)
+
+        # construct manifest
+        contents = {}
+        contents["README"] = {"file": str(readme_path), "transform": "id"}
+        contents["data"] = {"file": file_info["ReadPath"], "transform": "id"}
+        send_files = {}
+        for f_id, full_pkg_name in packages.items():
+            send_files[f_id] = {"package": full_pkg_name}
+        contents["files"] = send_files
+        node = {"contents": contents}
+
+        # write temporary manifest
+        temp_write_loc = pathlib.Path(os.getcwd())
+        temp_write_loc /= "single_file.yml"
+        with open(temp_write_loc, "w") as write_out:
+            yaml.dump(node, write_out, default_flow_style=False)
+
+        # create quilt node
+        full_pkg_name = quilt_user + "/" + ds_info["Name"]
+        with tools.suppress_prints():
+            quilt.build(full_pkg_name, str(temp_write_loc))
+
+        # remove files
+        os.remove(temp_write_loc)
+        os.remove(readme_path)
+        os.remove(ds_path)
+
+        return full_pkg_name
 
 
     def _upload_dataset(self, params: dict) -> pd.DataFrame:
@@ -752,9 +878,8 @@ class DatasetDatabase(object):
 
             for col in filepath_columns:
                 for i, item in enumerate(dataset[col]):
-                    f_id = self.fms.get_or_create_fileid(item)
-                    dataset[col][i] = \
-                        self.fms.get_readpath_from_fileid(f_id)
+                    file_info = self.fms.get_or_create_file(item)
+                    dataset[col][i] = file_info["ReadPath"]
 
         # begin iota creation
         print("\nCreating Iota...")
@@ -809,6 +934,7 @@ class DatasetDatabase(object):
             {"Name": name,
              "Description": description,
              "SourceId": source_id,
+             "FilepathColumns": str(filepath_columns),
              "Created": datetime.now()})
         output_dataset_id = dataset_info["DatasetId"]
 
