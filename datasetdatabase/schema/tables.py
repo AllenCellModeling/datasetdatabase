@@ -37,19 +37,6 @@ def create_Iota(schema: orator.Schema):
             table.unique(["GroupId", "Key", "Value", "ValueType"])
 
 
-def create_SourceType(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("SourceType"):
-        with schema.create("SourceType") as table:
-            table.increments("SourceTypeId")
-            table.string("Name", 50).unique()
-            table.string("Description").nullable()
-            table.datetime("Created")
-
-
 def create_Source(schema: orator.Schema):
     # enforce types
     checks.check_types(schema, orator.Schema)
@@ -58,12 +45,7 @@ def create_Source(schema: orator.Schema):
     if not schema.has_table("Source"):
         with schema.create("Source") as table:
             table.increments("SourceId")
-            table.integer("SourceTypeId").unsigned()
-            table.string("Name").unique()
             table.datetime("Created")
-            table.foreign("SourceTypeId") \
-                 .references("SourceTypeId") \
-                 .on("SourceType")
 
 
 def create_FileSource(schema: orator.Schema):
@@ -75,6 +57,21 @@ def create_FileSource(schema: orator.Schema):
         with schema.create("FileSource") as table:
             table.increments("FileSourceId")
             table.integer("FileId").unsigned()
+            table.integer("SourceId").unsigned()
+            table.foreign("SourceId") \
+                 .references("SourceId") \
+                 .on("Source")
+
+
+def create_QuiltSource(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("QuiltSource"):
+        with schema.create("QuiltSource") as table:
+            table.increments("QuiltSourceId")
+            table.string("PackageString")
             table.integer("SourceId").unsigned()
             table.foreign("SourceId") \
                  .references("SourceId") \

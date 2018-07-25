@@ -30,11 +30,35 @@ from ..utils import tools
 # globals
 UNIX_REPLACE = {"\\": "/"}
 DUPLICATE_DATA_CONFIRM = "Duplicate a maximum of {s} of data? (y / n) "
+STANDARD_UPLOAD_PARAMS = {"name": None,
+                          "description": None,
+                          "type_map": None,
+                          "value_validation_map": None,
+                          "import_as_type_map": False,
+                          "store_files": True,
+                          "force_storage": False,
+                          "filepath_columns": None,
+                          "replace_paths": UNIX_REPLACE}
 
 # bad, but until someone tells me how to fix [671]:
 #   dataset[col][i] = self.fms.get_readpath_from_fileid(f_id)
 # i dont know what else to do
 pd.options.mode.chained_assignment = None  # default='warn'
+
+
+# TODO:
+# documentation for:
+#   get_dataset
+#   process_run
+#   upload_dataset
+#   export_to_quilt
+#   import_from_quilt
+#   _create_dataset
+#
+#   quilt fms
+#
+# iota conversion from string storage to blob storage
+# form_dataset from iota ids
 
 
 class DatasetDatabase(object):
@@ -292,6 +316,11 @@ class DatasetDatabase(object):
             id = self.database.table(table).insert_get_id(items,
                 sequence=(table + "Id"))
             info = self.get_items_from_table(table, [table + "Id", "=", id])[0]
+
+            # update recent
+            self.recent[table].append(info)
+            if len(self.recent[table]) > self.cache_size:
+                self.recent[table] = self.recent[table][1:]
         except Exception as e:
             checks.check_ingest_error(e)
             info = self.get_items_from_table(table, conditions)[0]
@@ -300,15 +329,40 @@ class DatasetDatabase(object):
         if self.driver == "postgresql":
             info = dict(info)
 
-        # update recent
-        self.recent[table].append(info)
-        if len(self.recent[table]) > self.cache_size:
-            self.recent[table] = self.recent[table][1:]
-
         return info
 
 
-    def upload_files(self, filepaths: Union[str, list]) -> dict:
+    def upload_files(self, filepaths: Union[str, list]) -> list:
+        """
+        Upload a single file or list of files to this dataset database's fms.
+
+        Example
+        ==========
+        ```
+        >>> t = "/path/to/real/file.png"
+        >>> upload_files(t)
+        {"FileId": 1, "OriginalFilepath": "/path/to/real/file.png", ...}
+
+        >>> t = ["/path/to/real/file.png", "/path/to/nonexistant/file.png"]
+        upload_files(t)
+        FileNotFoundError: "/path/to/nonexistant/file.png" was not found.
+
+        ```
+
+        Parameters
+        ==========
+        filepaths: str, list
+            Which filepath or list of filepaths, to upload to the fms.
+
+        Returns
+        ==========
+        infos: list
+            A list of the rows (as dictionaries) created from the upload.
+
+        Errors
+        ==========
+
+        """
 
         # enforce types
         checks.check_types(filepaths, [str, list])
@@ -329,6 +383,37 @@ class DatasetDatabase(object):
                            name: Union[str, None] = None,
                            description: Union[str, None] = None) -> dict:
 
+        """
+        Short function that extends the insert_to_table function due to
+        specific needs of the idea of a user in a database.
+
+        Example
+        ==========
+        ```
+        >>> me = "jacksonb"
+        >>> get_or_create_user(me)
+        {"UserId": 1, "Name": "jacksonb", "Description": None, "Created": ...}
+
+        ```
+
+        Parameters
+        ==========
+        name: str, None
+            The name of the user to be added to the database, if None is
+            provided, the dataset database user is added.
+        description: str, None
+            The description of the user to be added to the database.
+
+        Returns
+        ==========
+        user_info: dict
+            The row that was added or found for that user.
+
+        Errors
+        ==========
+
+        """
+
         # enforce types
         checks.check_types(name, [str, type(None)])
         checks.check_types(description, [str, type(None)])
@@ -336,6 +421,9 @@ class DatasetDatabase(object):
         # get name
         if name is None:
             name = self.user
+
+        # enforce name
+        checks.check_user(name)
 
         # create or get user
         user_info = self.get_items_from_table("User", ["Name", "=", name])
@@ -351,33 +439,79 @@ class DatasetDatabase(object):
 
 
     def get_or_create_algorithm(self,
-                                algorithm: types.MethodType,
-                                name: Union[str, None],
-                                description: Union[str, None],
-                                version: Union[str, None]) -> dict:
+                        algorithm: Union[types.MethodType, types.FunctionType],
+                        name: Union[str, None],
+                        description: Union[str, None],
+                        version: Union[int, float, str, None]) -> dict:
+
+        """
+        Short function that extends the insert_to_table function due to
+        specific needs of the idea of a algorithm in a database.
+
+        Example
+        ==========
+        ```
+        >>> def hello():
+                print("hello")
+        >>> get_or_create_algorithm(hello, version=0.1)
+        {"AlgorithmId": 1, "Name": "hello", "Description": None, ...}
+
+        ```
+
+        Parameters
+        ==========
+        algorithm: method, function
+            The method to be added to the database.
+        name: str, None
+            The forced name to store in the database.
+            If none provided, it will attempt to retrieve the name by inspect.
+        description: str, None
+            The forced description to store in the database.
+        version: int, float, str, None
+            The forced version string, int, or float to store in the database.
+            If none provided, it will attempt to retrieve the git commit hash
+            of the methods directory.
+
+        Returns
+        ==========
+        alg_info: dict
+            The row that was added or found for that algorithm.
+
+        Errors
+        ==========
+        AssertionError:
+            No version passed and could not detect a git commit.
+
+        """
 
         # enforce types
-        checks.check_types(algorithm, types.MethodType)
+        checks.check_types(algorithm, [types.MethodType, types.FunctionType])
         checks.check_types(name, [str, type(None)])
         checks.check_types(description, [str, type(None)])
-        checks.check_types(version, [str, type(None)])
+        checks.check_types(version, [int, float, str, type(None)])
 
         # get name
         if name is None:
-            standard_begin = "<module '"
-            m_name = str(inspect.getmodule(algorithm))
-            m_start = m_name.index(standard_begin) + len(standard_begin)
-            m_name = m_name[m_start:]
-            standard_split = "' from '"
-            m_end = m_name.index(standard_split)
-            m_name = m_name[:m_end]
-            f_name = algorithm.__name__
+            str_alg = str(algorithm)
+            if "<bound method " in str_alg:
+                standard_begin = "<module '"
+                m_name = str(inspect.getmodule(algorithm))
+                m_start = m_name.index(standard_begin) + len(standard_begin)
+                m_name = m_name[m_start:]
+                standard_split = "' from '"
+                m_end = m_name.index(standard_split)
+                m_name = m_name[:m_end]
+                f_name = algorithm.__name__
 
-            name = m_name + "." + f_name
+                name = m_name + "." + f_name
+            else:
+                name = str_alg[len("<function ") : str_alg.index(" at ")]
 
+        # handle dsdb algorithm by using the package version
         if "datasetdatabase.datasetdatabase" in name:
             version = __version__
 
+        # attempt git hash check of repo
         if version is None:
             try:
                 git_dir = os.path.dirname(os.path.abspath(__file__))
@@ -390,6 +524,9 @@ class DatasetDatabase(object):
 
             assert len(hash) > 0, "Algorithm version could not be determined."
             version = hash
+
+        # convert version to string
+        version = str(version)
 
         # get or create alg
         alg_info = self.get_items_from_table("Algorithm",
@@ -469,7 +606,7 @@ class DatasetDatabase(object):
 
 
     def process_run(self,
-                    algorithm: types.MethodType,
+                    algorithm: Union[types.MethodType, types.FunctionType],
                     input_dataset_id: Union[int, None] = None,
                     input_dataset_name: Union[str, None] = None,
                     set_algorithm_name: Union[str, None] = None,
@@ -478,12 +615,12 @@ class DatasetDatabase(object):
                     name: Union[str, None] = None,
                     description: Union[str, None] = None,
                     alg_parameters: dict = {},
-                    dataset_parameters: dict = {}) -> dict:
+                    dataset_parameters: dict = STANDARD_UPLOAD_PARAMS) -> dict:
 
         # enforce types
         checks.check_types(input_dataset_id, [int, type(None)])
         checks.check_types(input_dataset_name, [str, type(None)])
-        checks.check_types(algorithm, types.MethodType)
+        checks.check_types(algorithm, [types.MethodType, types.FunctionType])
         checks.check_types(set_algorithm_name, [str, type(None)])
         checks.check_types(set_algorithm_description, [str, type(None)])
         checks.check_types(set_algorithm_version, [str, type(None)])
@@ -491,10 +628,6 @@ class DatasetDatabase(object):
         checks.check_types(description, [str, type(None)])
         checks.check_types(alg_parameters, dict)
         checks.check_types(dataset_parameters, dict)
-
-        # enforce that alg_parameters doesn't contain key input_dataset
-        assert "input_dataset" not in alg_parameters, \
-            "input_dataset is automatically added to alg parameters."
 
         # get dataset if provided
         input = None
@@ -521,14 +654,27 @@ class DatasetDatabase(object):
         begin = datetime.now()
 
         # use the dataset passed
-        alg_parameters["input_dataset"] = input
-        output_dataset = algorithm(alg_parameters)
+        output_dataset = algorithm(input, alg_parameters)
 
         # check output
         checks.check_types(output_dataset, pd.DataFrame)
 
         # create iota from new dataset
+        if dataset_parameters != STANDARD_UPLOAD_PARAMS:
+            dataset_parameters = {**STANDARD_UPLOAD_PARAMS,
+                                  **dataset_parameters}
+
         dataset_parameters["dataset"] = output_dataset
+
+        # create source
+        source_info = self.insert_to_table("Source",
+                        {"Created": datetime.now()})
+        dataset_parameters["source_info"] = source_info
+        if "source_type" not in dataset_parameters:
+            dataset_parameters["source_type"] = "RunSource"
+        if "source_type_id" not in dataset_parameters:
+            dataset_parameters["source_type_id"] = None
+
         output_dataset_info = self._create_dataset(dataset_parameters)
 
         # end time
@@ -542,22 +688,25 @@ class DatasetDatabase(object):
                                          "Description": description,
                                          "Begin": begin,
                                          "End": end})
-        run_id = run_info["RunId"]
 
         # insert run input
         if input_dataset_id is not None:
             self.insert_to_table("RunInput",
-                                 {"RunId": run_id,
+                                 {"RunId": run_info["RunId"],
                                   "DatasetId": input_dataset_id,
                                   "Created": datetime.now()})
 
         # insert run output
         self.insert_to_table("RunOutput",
-                             {"RunId": run_id,
+                             {"RunId": run_info["RunId"],
                               "DatasetId": output_dataset_info["DatasetId"],
                               "Created": datetime.now()})
 
-
+        # insert run source
+        if dataset_parameters["source_type"] in ["RunSource"]:
+            self.insert_to_table("RunSource",
+                                 {"SourceId": source_info["SourceId"],
+                                  "RunId": run_info["RunId"]})
 
         return output_dataset_info
 
@@ -567,16 +716,19 @@ class DatasetDatabase(object):
 
 
     def upload_dataset(self,
-                       dataset: Union[str, pathlib.Path, pd.DataFrame],
-                       name: Union[str, None] = None,
-                       description: Union[str, None] = None,
-                       type_map: Union[dict, None] = None,
-                       value_validation_map: Union[dict, None] = None,
-                       import_as_type_map: bool = False,
-                       store_files: bool = True,
-                       force_storage: bool = False,
-                       filepath_columns: Union[str, list, None] = None,
-                       replace_paths: Union[dict, None] = UNIX_REPLACE) -> dict:
+        dataset: Union[str, pathlib.Path, pd.DataFrame],
+        name: Union[str, None] = STANDARD_UPLOAD_PARAMS["name"],
+        description: Union[str, None] = STANDARD_UPLOAD_PARAMS["description"],
+        type_map: Union[dict, None] = STANDARD_UPLOAD_PARAMS["type_map"],
+        value_validation_map: Union[dict, None] = \
+            STANDARD_UPLOAD_PARAMS["value_validation_map"],
+        import_as_type_map: bool = STANDARD_UPLOAD_PARAMS["import_as_type_map"],
+        store_files: bool = STANDARD_UPLOAD_PARAMS["store_files"],
+        force_storage: bool = STANDARD_UPLOAD_PARAMS["force_storage"],
+        filepath_columns: Union[str, list, None] =\
+            STANDARD_UPLOAD_PARAMS["filepath_columns"],
+        replace_paths: Union[dict, None] =\
+            STANDARD_UPLOAD_PARAMS["replace_paths"]) -> dict:
 
         # enforce types
         checks.check_types(dataset, [str, pathlib.Path, pd.DataFrame])
@@ -649,7 +801,8 @@ class DatasetDatabase(object):
         params["force_storage"] = force_storage
         params["filepath_columns"] = filepath_columns
         params["replace_paths"] = replace_paths
-        params["file_id"] = file_info["FileId"]
+        params["source_type"] = "FileSource"
+        params["source_type_id"] = file_info["FileId"]
 
         # run upload
         ds_info = self.process_run(algorithm=self._upload_dataset,
@@ -756,7 +909,87 @@ class DatasetDatabase(object):
         return full_pkg_name
 
 
-    def _upload_dataset(self, params: dict) -> pd.DataFrame:
+    def import_from_quilt(self, package_name: str) \
+        -> Union[dict, ModuleNotFoundError]:
+        # enforce types
+        checks.check_types(package_name, str)
+
+        # split package_name
+        if "/" in package_name:
+            package_split = package_name.split("/")
+            user = package_split[0]
+            package = package_split[1]
+        else:
+            user = "dsdb"
+            package = package_name
+
+        # attempt import
+        full_import = "quilt.data." + user + "." + package
+        try:
+            package = importlib.import_module(full_import)
+        except ModuleNotFoundError:
+            try:
+                with tools.suppress_prints():
+                    quilt.install(user + "/" + package)
+                package = importlib.import_module(full_import)
+            except HTTPResponseException:
+                err = "Quilt package, {p}, not found...".format(p=full_import)
+                raise ModuleNotFoundError(err)
+
+        # run hash check of dataset
+        hash = self.fms.get_hash(package.data())
+        file_info = self.fms.get_file(filepath=package.data(), hash=hash)
+
+        # return if exists
+        if file_info is not None:
+            try:
+                found_ds = self.database.table("Dataset") \
+                 .join("Source", "Dataset.SourceId", "=", "Source.SourceId") \
+                 .join("FileSource",
+                       "FileSource.SourceId", "=", "Source.SourceId") \
+                 .where("FileId", "=", file_info["FileId"]).get()[0]
+
+                found_ds = self.get_items_from_table("Dataset",
+                                ["DatasetId", "=", found_ds["DatasetId"]])[0]
+                return found_ds
+            except IndexError:
+                pass
+
+        # get basic dataset info
+        ds_info = tools.parse_readme(package.README())
+
+        # update the filepath columns with real filepaths
+        dataset = pd.read_pickle(package.data())
+        if ds_info["FilepathColumns"] is not None:
+            for col in ds_info["FilepathColumns"]:
+                for i, item in enumerate(dataset[col]):
+                    fp = getattr(package.files, dataset[col][i]).load()
+                    dataset[col][i] = fp
+
+        # create the params object to be passed all they way to the private func
+        params = {}
+        params["dataset"] = dataset
+        params["name"] = package_name
+        params["description"] = ds_info["Description"]
+        params["type_map"] = None
+        params["value_validation_map"] = None
+        params["import_as_type_map"] = False
+        params["store_files"] = True
+        params["force_storage"] = True
+        params["filepath_columns"] = ds_info["FilepathColumns"]
+        params["replace_paths"] = UNIX_REPLACE
+        params["source_type"] = "QuiltSource"
+        params["source_type_id"] = package_name
+
+        # run upload
+        ds_info = self.process_run(algorithm=self._upload_dataset,
+                                   alg_parameters=params,
+                                   dataset_parameters=params)
+
+        return ds_info
+
+
+    def _upload_dataset(self, input, params: dict) -> pd.DataFrame:
         # just return
         return params["dataset"]
 
@@ -773,14 +1006,24 @@ class DatasetDatabase(object):
         force_storage = params["force_storage"]
         filepath_columns = params["filepath_columns"]
         replace_paths = params["replace_paths"]
-        file_id = params["file_id"]
+        source_type = params["source_type"]
+        source_type_id = params["source_type_id"]
+        source_info = params["source_info"]
 
         # read dataset
         if isinstance(dataset, pathlib.Path):
             dataset = pd.read_csv(dataset)
 
-        source_type_info = self.get_items_from_table("SourceType",
-                            ["Name", "=", "FileSource"])[0]
+        # update name
+        if name is None:
+            dataset = dataset.copy()
+            ds_path = tools.create_pickle_file(dataset)
+            name = self.fms.get_hash(ds_path)
+            os.remove(ds_path)
+
+        # convert types
+        if isinstance(filepath_columns, str):
+            filepath_columns = [filepath_columns]
 
         # create or get user
         user_info = self.get_items_from_table("User", ["Name", "=", self.user])
@@ -790,28 +1033,6 @@ class DatasetDatabase(object):
                              "Created": datetime.now()})
         else:
             user_info = user_info[0]
-
-        # create or get source
-        source_info = self.get_items_from_table("Source",
-                            ["Name", "=", file_id])
-        if len(source_info) == 0:
-            source_info = self.insert_to_table("Source",
-                            {"SourceTypeId": source_type_info["SourceTypeId"],
-                             "Name": file_id,
-                             "Created": datetime.now()})
-        else:
-            source_info = source_info[0]
-        source_id = source_info["SourceId"]
-
-        # create or get file source
-        file_source_info = self.get_items_from_table("FileSource",
-                            ["FileId", "=", file_id])
-        if len(file_source_info) == 0:
-            file_source_info = self.insert_to_table("FileSource",
-                            {"SourceId": source_info["SourceId"],
-                             "FileId": file_id})
-        else:
-            file_source_info = file_source_info[0]
 
         # begin checks
         print("Validating Dataset...")
@@ -860,8 +1081,7 @@ class DatasetDatabase(object):
                              total=total_upload)
 
         # store files
-        if filepath_columns is not None and \
-            store_files:
+        if filepath_columns is not None and store_files:
             if not force_storage:
                 total_size = 0
                 for i, row in dataset[filepath_columns].iterrows():
@@ -880,6 +1100,20 @@ class DatasetDatabase(object):
                 for i, item in enumerate(dataset[col]):
                     file_info = self.fms.get_or_create_file(item)
                     dataset[col][i] = file_info["ReadPath"]
+
+        # create or get file source
+        if source_type == "FileSource":
+            source_type_info = self.insert_to_table("FileSource",
+                            {"FileId": source_type_id,
+                             "SourceId": source_info["SourceId"]})
+        # get or create quilt source
+        elif source_type == "QuiltSource":
+            source_type_info = self.insert_to_table("QuiltSource",
+                            {"PackageString": source_type_id,
+                             "SourceId": source_info["SourceId"]})
+        # handle invalid source type
+        elif source_type != "RunSource":
+            raise ValueError("Invalid source type passed to create dataset.")
 
         # begin iota creation
         print("\nCreating Iota...")
@@ -933,7 +1167,7 @@ class DatasetDatabase(object):
         dataset_info = self.insert_to_table("Dataset",
             {"Name": name,
              "Description": description,
-             "SourceId": source_id,
+             "SourceId": source_info["SourceId"],
              "FilepathColumns": str(filepath_columns),
              "Created": datetime.now()})
         output_dataset_id = dataset_info["DatasetId"]

@@ -58,8 +58,10 @@ class FMS(object):
                      .on("File")
 
         # update db recent map
-        self.dsdb.recent["File"] = []
-        self.dsdb.tables["File"] = self.dsdb.database.table("File")
+        if "File" not in self.dsdb.recent:
+            self.dsdb.recent["File"] = []
+        if "File" not in self.dsdb.tables:
+            self.dsdb.tables["File"] = self.dsdb.database.table("File")
 
 
     def create_File(self, schema: orator.Schema):

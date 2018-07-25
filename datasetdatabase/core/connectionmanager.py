@@ -270,7 +270,7 @@ class ConnectionManager(object):
 
         # copy config portion and rename
         config = copy.deepcopy(self.connections[current][current])
-        del self.connections[current]
+        self.connections.pop(current)
         self.connections[new] = {new: config}
 
 

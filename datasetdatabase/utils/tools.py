@@ -2,6 +2,7 @@
 
 # installed
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Union
 import pandas as pd
 import pathlib
@@ -9,6 +10,7 @@ import pickle
 import time
 import math
 import sys
+import ast
 import os
 
 # self
@@ -130,15 +132,20 @@ def write_dataset_readme(ds_info: dict,
     # construct readme
     # name
     readme = ""
-    if ds_info["Name"] is not None:
-        readme += "# " + ds_info["Name"] + ":"
-        readme += "\n\n"
+    readme += "# " + ds_info["Name"] + ":"
+    readme += "\n\n"
 
     # description
     if ds_info["Description"] is not None:
         readme += "## Description:"
         readme += "\n"
         readme += ds_info["Description"]
+        readme += "\n\n"
+
+    if ds_info["FilepathColumns"] is not None:
+        readme += "## Filepath Columns:"
+        readme += "\n"
+        readme += ds_info["FilepathColumns"]
         readme += "\n\n"
 
     # created
@@ -170,3 +177,31 @@ def write_dataset_readme(ds_info: dict,
         write_out.write(readme)
 
     return path
+
+
+def parse_readme(filepath: Union[str, pathlib.Path]) -> dict:
+    # enforce types
+    checks.check_types(filepath, [str, pathlib.Path])
+    checks.check_file_exists(filepath)
+
+    # convert types
+    filepath = pathlib.Path(filepath)
+
+    # read contents
+    with open(filepath, "r") as read_in:
+        lines = read_in.readlines()
+
+    # default contents
+    info = {"Description": None,
+            "FilepathColumns": None}
+
+    # parse contents
+    for i, line in enumerate(lines):
+        if line.startswith("## "):
+            if "## Description:" in line:
+                info["Description"] = lines[i + 1].replace("\n", "")
+            if "## Filepath Columns:" in line:
+                cols = lines[i + 1].replace("\n", "")
+                info["FilepathColumns"] = ast.literal_eval(cols)
+
+    return info

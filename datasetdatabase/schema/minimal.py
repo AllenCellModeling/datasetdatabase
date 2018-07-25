@@ -13,9 +13,9 @@ from ..utils import checks
 # CREATION ORDER OF TABLES MATTERS
 TABLES = {"User": tables.create_User,
           "Iota": tables.create_Iota,
-          "SourceType": tables.create_SourceType,
           "Source": tables.create_Source,
           "FileSource": tables.create_FileSource,
+          "QuiltSource": tables.create_QuiltSource,
           "Dataset": tables.create_Dataset,
           "IotaDatasetJunction": tables.create_IotaDatasetJunction,
           "Algorithm": tables.create_Algorithm,
@@ -38,26 +38,28 @@ def drop_schema(db):
     for tbl in drop_order:
         db.schema.drop_if_exists(tbl)
         try:
-            del db.tables[tbl]
+            db.tables.pop(tbl)
+            db.recent.pop(tbl)
         except KeyError:
             pass
 
 
 def add_basic_info(db):
-    now = datetime.now()
-
-    # add SourceType
-    try:
-        db.database.table("SourceType").insert([
-            {"Name": "FileSource",
-             "Description": "Id attached should be read using FMS get.",
-             "Created": now},
-            {"Name": "RunSource",
-             "Description": "Id attached should be read using dataset get.",
-             "Created": now}
-        ])
-    except Exception as e:
-        checks.check_ingest_error(e)
+    return None
+    # now = datetime.now()
+    #
+    # # add SourceType
+    # try:
+    #     db.database.table("SourceType").insert([
+    #         {"Name": "FileSource",
+    #          "Description": "Id attached should be read using FMS get.",
+    #          "Created": now},
+    #         {"Name": "RunSource",
+    #          "Description": "Id attached should be read using dataset get.",
+    #          "Created": now}
+    #     ])
+    # except Exception as e:
+    #     checks.check_ingest_error(e)
 
     # add dsdb Algorithms
     # try:
