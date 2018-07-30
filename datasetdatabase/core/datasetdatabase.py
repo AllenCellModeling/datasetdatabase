@@ -504,10 +504,8 @@ class DatasetDatabase(object):
                 name = str_alg[len("<function ") : str_alg.index(" at ")]
 
         # handle dsdb algorithm by using the package version
-        if "datasetdatabase.datasetdatabase" in name:
+        if "datasetdatabase.core.datasetdatabase" in name:
             version = __version__
-            print(version)
-            print(__version__)
 
         # attempt git hash check of repo
         if version is None:
