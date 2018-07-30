@@ -48,16 +48,12 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 # TODO:
 # documentation for:
-#   get_dataset
-#   process_run
-#   upload_dataset
 #   export_to_quilt
 #   import_from_quilt
 #   _create_dataset
 #
 #   quilt fms
 #
-# iota conversion from string storage to blob storage
 # form_dataset from iota ids
 
 
@@ -204,7 +200,7 @@ class DatasetDatabase(object):
 
     def get_items_from_table(self,
                              table: str,
-                             conditions: Union[list, None]) -> dict:
+                             conditions: list = []) -> dict:
         """
         Get all items from a table where conditions are met.
 
@@ -227,8 +223,8 @@ class DatasetDatabase(object):
         ==========
         table: str
             Which table in the database to retrieve items from.
-        conditions: list, None
-            Which conditions to match items for. None for all items return.
+        conditions: list
+            Which conditions to match items for. Leave blank for all items.
 
         Returns
         ==========
@@ -550,6 +546,51 @@ class DatasetDatabase(object):
                     columns: Union[str, list, None] = None,
                     get_info_items: bool = False) \
                     -> Union[pd.DataFrame, KeyError]:
+        """
+        Using either a dataset id, name, or source id, return the formed and
+        recasted dataset.
+
+        Example
+        ==========
+        ```
+        >>> get_dataset(1)
+            |   files       |   structs     |   ...     |
+        0   |   foo/1.png   |   myosin      |   ...     |
+        1   |   foo/2.png   |   actin       |   ...     |
+        ...
+
+        >>> get_dataset(1, columns="files")
+            |   files
+        0   |   foo/1.png
+        1   |   foo/2.png
+        ...
+
+        ```
+
+        Parameters
+        ==========
+        id: int, None
+            The dataset id as it is stored in the database.
+        name: str, None
+            The dataset name as it is stored in the database.
+        sourceid: int, None
+            The source id of the dataset as it is stored in the database.
+        columns: str, list, None
+            Which columns to return. None for all.
+        get_info_items: bool
+            Should the Iota items be returned and attached to the dataframe.
+
+        Returns
+        ==========
+        df: pandas.DataFrame
+            The desired dataset after reformation and casting.
+
+        Errors
+        ==========
+        AssertionError:
+            Must provide a dataset id, name, or source id for the query.
+
+        """
 
         # enforce types
         checks.check_types(id, [int, type(None)])
@@ -605,6 +646,46 @@ class DatasetDatabase(object):
         return ds
 
 
+    def search(self,
+               seq: Union[str, list],
+               sep: Union[str, None] = None,
+               search_keys: bool = False,
+               search_values: bool = False,
+               all_combinations_search: bool = False) -> dict:
+
+        # enforce types
+        checks.check_types(seq, [str, list])
+        checks.check_types(sep, [str, type(None)])
+        checks.check_types(search_keys, bool)
+        checks.check_types(search_values, bool)
+        checks.check_types(all_combinations_search, bool)
+
+        # convert
+        if isinstance(seq, str):
+            seq = seq.split(sep)
+
+        # create combinations
+        if all_perm_search:
+            import itertools
+            seq = itertools.combinations(seq)
+
+        print(seq)
+
+        # scores object
+        scores = {}
+
+        # datasets
+        datasets = self.get_items_from_table("Dataset")
+
+        # # compute scores
+        # for ds in datasets:
+        #     score = 0.0
+        #
+        #     for word in seq:
+
+        print(list(datasets))
+
+
     def process_run(self,
                     algorithm: Union[types.MethodType, types.FunctionType],
                     input_dataset_id: Union[int, None] = None,
@@ -616,6 +697,58 @@ class DatasetDatabase(object):
                     description: Union[str, None] = None,
                     alg_parameters: dict = {},
                     dataset_parameters: dict = STANDARD_UPLOAD_PARAMS) -> dict:
+
+        """
+        Process an dataset using an algorithm and provided parameters.
+
+        Example
+        ==========
+        ```
+        >>> def add_one(df, params):
+                return df["column_i_care_about"] += 1
+        >>> process_run(add_one, 1)
+        {"DatasetId": 2, ...}
+
+        >>> def conditional_add(df, params):
+                return df[params["col"]] += params["add_by"]
+        >>> run_params = {"col": "column_i_care_about", "add_by": 3}
+        >>> process_run(conditional_add, 2, alg_parameters=run_params)
+        {"DatasetId": 3, ...}
+
+        ```
+
+        Parameters
+        ==========
+        algorithm: method, function
+            The method or function to run against a dataset. Your algorithm must
+            return a pandas.DataFrame.
+        input_dataset_id: int, None
+            The dataset id as stored in the database.
+        input_dataset_name: str, None
+            The dataset name as stored in the database.
+        set_algorithm_name: str, None
+            What the method or function passed as algorithm should be given as a
+            name.
+        set_algorithm_description: str, None
+            What the method or function passed as algorithm should be given as a
+            description.
+        set_algorithm_version: str, None
+            What the method or function passed as algorithm should be given as a
+            version.
+        name: str, None
+            The name of this run.
+        description: str, None
+            The description of this run.
+        alg_parameters: dict
+            Parameters to be passed to the algorithm provided.
+        dataset_parameters: dict
+            Parameters to be used during the upload of the returned
+            pandas.DataFrame from your algorithm.
+
+            Default: STANDARD_UPLOAD_PARAMS, if you only pass a single upload
+            parameter the rest will be filled in from the default.
+
+        """
 
         # enforce types
         checks.check_types(input_dataset_id, [int, type(None)])
@@ -729,6 +862,69 @@ class DatasetDatabase(object):
             STANDARD_UPLOAD_PARAMS["filepath_columns"],
         replace_paths: Union[dict, None] =\
             STANDARD_UPLOAD_PARAMS["replace_paths"]) -> dict:
+
+        """
+        Upload a dataframe like dataset to the database. If the dataset already
+        exists in the database it is not doubly uploaded.
+
+        Example
+        ==========
+        ```
+        >>> rows = [{"ints": 0, "strs": "foo1"},
+                    {"ints": 1, "strs": "foo2"}]
+        >>> df = pd.DataFrame(rows)
+        >>> upload_dataset(df)
+        {"DatasetId": 1, ...}
+
+        >>> upload_dataset(df)
+        {"DatasetId": 1, ...}
+
+        ```
+
+        Parameters
+        ==========
+        dataset: str, pathlib.Path, pandas.DataFrame
+            The dataset to be uploaded. Strings and pathlib.Paths will be opened
+            using pandas.
+        name: str, None
+            The name the dataset should be given.
+        description: str, None
+            The description the dataset should be given.
+        type_map: dict, None
+            A dictionary of columns and what type is allowed in that column.
+            Ex: {"ints": int}
+        value_validation_map: dict, None
+            A dictionary of columns and a checking function that validates the
+            values of that column.
+            Ex: {"ints": lambda x: return x >= 4}
+        import_as_type_map: bool
+            Before validation occurs, attempt to cast the values contained in
+            the type_map columns to their mapped types.
+        store_files: bool
+            Should files be stored/ uploaded to a file management system.
+        force_storage: bool
+            Should storage of files be forced.
+
+            Default: False, before storing files, size of upload will be
+            calculated and user will be asked to approve the upload.
+        filepath_columns: str, list, None
+            Which columns contain filepaths.
+        replace_paths: dict, None
+            A dictionary with key and value mapping how paths should be
+            manipulated.
+
+            Ex: {"\\": "/"}, None for no path manipulation.
+
+        Returns
+        ==========
+        ds_info: dict
+            The database row that stores the information regarding the ingested
+            dataset.
+
+        Errors
+        ==========
+
+        """
 
         # enforce types
         checks.check_types(dataset, [str, pathlib.Path, pd.DataFrame])

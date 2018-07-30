@@ -52,10 +52,13 @@ class FMS(object):
             self.create_File(self.dsdb.schema)
 
             # update FileSource relationship
-            with self.dsdb.schema.table("FileSource") as table:
-                table.foreign("FileId") \
-                     .references("FileId") \
-                     .on("File")
+            try:
+                with self.dsdb.schema.table("FileSource") as table:
+                    table.foreign("FileId") \
+                         .references("FileId") \
+                         .on("File")
+            except orator.exceptions.query.QueryException:
+                pass
 
         # update db recent map
         if "File" not in self.dsdb.recent:
