@@ -506,20 +506,23 @@ class DatasetDatabase(object):
         # handle dsdb algorithm by using the package version
         if "datasetdatabase.datasetdatabase" in name:
             version = __version__
+            print(version)
+            print(__version__)
 
         # attempt git hash check of repo
         if version is None:
+            version = ""
             try:
                 git_dir = os.path.dirname(os.path.abspath(__file__))
-                hash = subprocess.check_output(
+                version = subprocess.check_output(
                     ["git", "rev-list", "-1", "HEAD", "./"], cwd=git_dir)
-                hash = hash.strip()
-                hash = hash.decode("utf-8")
+                version = version.strip()
+                version = version.decode("utf-8")
             except subprocess.CalledProcessError:
                 pass
 
-            assert len(hash) > 0, "Algorithm version could not be determined."
-            version = hash
+            assert len(version) > 0, \
+            "Algorithm version could not be determined."
 
         # convert version to string
         version = str(version)
