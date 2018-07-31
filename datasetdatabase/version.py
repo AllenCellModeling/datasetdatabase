@@ -67,5 +67,6 @@ REQUIRES = ["numpy",
             "pandas",
             "orator",
             "pathlib",
-            "psycopg2_binary"]
+            "psycopg2_binary",
+            "python_Levenshtein"]
 SCRIPTS = []
