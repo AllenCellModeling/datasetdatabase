@@ -372,10 +372,7 @@ def validate_dataset_values(dataset: pd.DataFrame,
 
     # enforce all dataset values to meet the lambda requirements
     if validation_map is not None:
-        for key in value_validation_map:
-            dataset[key].apply(lambda x: assert validation_map[k](v),
-                                            err.format(c=key, v=x))
-        # for i, row in dataset.iterrows():
-        #     for k, v in dict(row).items():
-        #         if k in validation_map:
-        #             assert validation_map[k](v), err.format(k=k, i=i, v=v)
+        for i, row in dataset.iterrows():
+            for k, v in dict(row).items():
+                if k in validation_map:
+                    assert validation_map[k](v), err.format(k=k, i=i, v=v)
