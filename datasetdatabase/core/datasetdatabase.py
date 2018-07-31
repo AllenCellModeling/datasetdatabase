@@ -820,7 +820,7 @@ class DatasetDatabase(object):
         for result in scores[:5]:
             print(result["ds_info"]["Name"], result["score"])
 
-        # print(list(datasets))
+        return scores
 
 
     def process_run(self,
