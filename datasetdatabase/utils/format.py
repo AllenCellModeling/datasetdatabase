@@ -37,12 +37,14 @@ def cast(value: str, value_type: str, **kwargs):
     return result
 
 
-def quick_cast(value, cast_type):
+def quick_cast(value, cast_type, info=None):
     try:
         if not isinstance(value, cast_type):
             return cast_type(value)
     except ValueError:
-        raise ValueError("Could not cast:", value, "to:", cast_type)
+        raise ValueError("Could not cast:", value,
+                         "to:", cast_type,
+                         "\ninfo:", info)
 
     return value
 
@@ -57,13 +59,10 @@ def format_dataset(dataset: pd.DataFrame,
 
     # format data if type_map was passed
     if type_map is not None:
-        for i, row in dataset.iterrows():
-            for key, value in dict(row).items():
-                if key in type_map:
-                    try:
-                        dataset[key][i] = quick_cast(value, type_map[key])
-                    except (ValueError, TypeError):
-                        raise TypeError(err.format(c=key, r=i))
+        for key, ctype in type_map.items():
+            dataset[key] = dataset[key].apply(lambda v: quick_cast(v,
+                                                        ctype,
+                                                        "Column: " + key))
 
     return dataset
 
