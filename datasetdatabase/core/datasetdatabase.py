@@ -817,9 +817,6 @@ class DatasetDatabase(object):
             scores.append({"score": score, "ds_info": ds})
             scores = sorted(scores, key=lambda x: x["score"], reverse=True)
 
-        for result in scores[:5]:
-            print(result["ds_info"]["Name"], result["score"])
-
         return scores
 
 
