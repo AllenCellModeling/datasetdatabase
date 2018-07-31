@@ -58,6 +58,7 @@ def create_FileSource(schema: orator.Schema):
             table.increments("FileSourceId")
             table.integer("FileId").unsigned()
             table.integer("SourceId").unsigned()
+            table.datetime("Created")
             table.foreign("SourceId") \
                  .references("SourceId") \
                  .on("Source")
@@ -73,6 +74,7 @@ def create_QuiltSource(schema: orator.Schema):
             table.increments("QuiltSourceId")
             table.string("PackageString")
             table.integer("SourceId").unsigned()
+            table.datetime("Created")
             table.foreign("SourceId") \
                  .references("SourceId") \
                  .on("Source")
@@ -201,6 +203,7 @@ def create_RunSource(schema: orator.Schema):
             table.increments("RunSourceId")
             table.integer("SourceId").unsigned()
             table.integer("RunId").unsigned()
+            table.datetime("Created")
             table.foreign("SourceId") \
                  .references("SourceId") \
                  .on("Source")

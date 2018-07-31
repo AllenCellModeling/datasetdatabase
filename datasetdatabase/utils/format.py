@@ -64,8 +64,6 @@ def format_dataset(dataset: pd.DataFrame,
                         dataset[key][i] = quick_cast(value, type_map[key])
                     except (ValueError, TypeError):
                         raise TypeError(err.format(c=key, r=i))
-            # for key, ctype in type_map.items():
-            # dataset[key] = dataset[key].apply(lambda v: quick_cast(v, ctype))
 
     return dataset
 

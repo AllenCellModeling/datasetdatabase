@@ -60,9 +60,7 @@ class FMS(object):
             except orator.exceptions.query.QueryException:
                 pass
 
-        # update db recent map
-        if "File" not in self.dsdb.recent:
-            self.dsdb.recent["File"] = []
+        # update table map
         if "File" not in self.dsdb.tables:
             self.dsdb.tables["File"] = self.dsdb.database.table("File")
 

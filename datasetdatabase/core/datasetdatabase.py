@@ -160,9 +160,6 @@ class DatasetDatabase(object):
         if build:
             self.construct_tables(self.schema_version)
 
-        # recent since connection made
-        self.recent = {table: [] for table in self.tables}
-
         # run fms module setup
         self.fms = fms.FMS(self, fms_connection_options, build)
 
@@ -256,7 +253,7 @@ class DatasetDatabase(object):
         items = items.get()
 
         # format return
-        if self.driver == "postgresql":
+        if self.driver == "postgres" or self.driver == "postgresql":
             items = [dict(r) for row in items]
 
         return items
@@ -314,16 +311,12 @@ class DatasetDatabase(object):
                 sequence=(table + "Id"))
             info = self.get_items_from_table(table, [table + "Id", "=", id])[0]
 
-            # update recent
-            self.recent[table].append(info)
-            if len(self.recent[table]) > self.cache_size:
-                self.recent[table] = self.recent[table][1:]
         except Exception as e:
             checks.check_ingest_error(e)
             info = self.get_items_from_table(table, conditions)[0]
 
         # format row
-        if self.driver == "postgresql":
+        if self.driver == "postgres" or self.driver == "postgresql":
             info = dict(info)
 
         return info
@@ -840,7 +833,8 @@ class DatasetDatabase(object):
         if dataset_parameters["source_type"] in ["RunSource"]:
             self.insert_to_table("RunSource",
                                  {"SourceId": source_info["SourceId"],
-                                  "RunId": run_info["RunId"]})
+                                  "RunId": run_info["RunId"],
+                                  "Created": datetime.now()})
 
         return output_dataset_info
 
@@ -1298,16 +1292,20 @@ class DatasetDatabase(object):
                     file_info = self.fms.get_or_create_file(item)
                     dataset[col][i] = file_info["ReadPath"]
 
+        now = datetime.now()
+
         # create or get file source
         if source_type == "FileSource":
             source_type_info = self.insert_to_table("FileSource",
                             {"FileId": source_type_id,
-                             "SourceId": source_info["SourceId"]})
+                             "SourceId": source_info["SourceId"],
+                             "Created": now})
         # get or create quilt source
         elif source_type == "QuiltSource":
             source_type_info = self.insert_to_table("QuiltSource",
                             {"PackageString": source_type_id,
-                             "SourceId": source_info["SourceId"]})
+                             "SourceId": source_info["SourceId"],
+                             "Created": now})
         # handle invalid source type
         elif source_type != "RunSource":
             raise ValueError("Invalid source type passed to create dataset.")
@@ -1411,24 +1409,44 @@ class DatasetDatabase(object):
     def _deep_print(self):
         print(("-" * 31) + " DATASET DATABASE " + ("-" * 31))
 
-        for table, items in self.recent.items():
+        for name, table in self.tables.items():
             print("-" * 80)
-
-            print(table + ":")
             try:
-                print("rows: {r}".format(r=self.tables[table].count()))
-                print("recent:")
-                for r in self.recent[table]:
-                    print(r)
-            except KeyError:
-                print("!not built!")
+                print("Recent " + name + ":")
+                if name == "Run":
+                    recent = table\
+                                  .order_by("End", "desc")\
+                                  .limit(self.cache_size)\
+                                  .get()
+                else:
+                    recent = table\
+                                  .order_by("Created", "desc")\
+                                  .limit(self.cache_size)\
+                                  .get()
+
+                if self.driver == "postgres" or self.driver == "postgresql":
+                    recent = [dict(row) for row in recent]
+
+                for item in recent:
+                    print(item)
+
+            except (orator.exceptions.query.QueryException, KeyError) as e:
+                print("!package or schema not up to date!")
 
 
     def __str__(self):
         disp = "Recent Datasets:"
         disp += ("\n" + ("-" * 80))
-        for row in self.recent["Dataset"]:
-            disp += "\n{r}".format(r=row)
+        recent = self.tables["Dataset"]\
+                     .order_by("Created", "desc")\
+                     .limit(self.cache_size)\
+                     .get()
+
+        if self.driver == "postgres" or self.driver == "postgresql":
+            recent = [dict(row) for row in recent]
+
+        for item in recent:
+            disp += ("\n" + str(item))
 
         return disp
 

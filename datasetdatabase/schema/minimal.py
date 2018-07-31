@@ -39,7 +39,6 @@ def drop_schema(db):
         db.schema.drop_if_exists(tbl)
         try:
             db.tables.pop(tbl)
-            db.recent.pop(tbl)
         except KeyError:
             pass
 
