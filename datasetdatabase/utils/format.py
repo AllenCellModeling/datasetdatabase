@@ -53,10 +53,19 @@ def format_dataset(dataset: pd.DataFrame,
     checks.check_types(dataset, pd.DataFrame)
     checks.check_types(type_map, [dict, type(None)])
 
+    err = "Dataset failed inherent cast as type map at:\n\tcol:{c}\n\trow:{r}"
+
     # format data if type_map was passed
     if type_map is not None:
-        for key, ctype in type_map.items():
-            dataset[key] = dataset[key].apply(lambda v: quick_cast(v, ctype))
+        for i, row in dataset.iterrows():
+            for key, value in dict(row).items():
+                if key in type_map:
+                    try:
+                        dataset[key][i] = quick_cast(value, type_map[key])
+                    except (ValueError, TypeError):
+                        raise TypeError(err.format(c=key, r=i))
+            # for key, ctype in type_map.items():
+            # dataset[key] = dataset[key].apply(lambda v: quick_cast(v, ctype))
 
     return dataset
 

@@ -329,6 +329,8 @@ def validate_dataset_types(dataset: pd.DataFrame,
     check_types(type_map, [dict, type(None)])
     check_types(filepath_columns, [str, list, type(None)])
 
+    err = "Dataset failed type check at:\n\tcol:{c}\n\trow:{r}"
+
     # convert types
     if isinstance(filepath_columns, str):
         filepath_columns = [filepath_columns]
@@ -340,7 +342,8 @@ def validate_dataset_types(dataset: pd.DataFrame,
             for key, value in dict(row).items():
                 if type_map is not None:
                     if key in type_map:
-                        check_types(value, type_map[key])
+                        err = err.format(c=key, r=i)
+                        check_types(value, type_map[key], err=err)
 
                 if filepath_columns is not None:
                     if key in filepath_columns:

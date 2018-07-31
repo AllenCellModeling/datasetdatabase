@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import subprocess
 import importlib
+import itertools
 import pathlib
 import inspect
 import getpass
@@ -666,8 +667,7 @@ class DatasetDatabase(object):
             seq = seq.split(sep)
 
         # create combinations
-        if all_perm_search:
-            import itertools
+        if all_combinations_search:
             seq = itertools.combinations(seq)
 
         print(seq)
