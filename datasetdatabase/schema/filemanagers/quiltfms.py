@@ -63,6 +63,9 @@ class FMS(object):
         # update table map
         if "File" not in self.dsdb.tables:
             self.dsdb.tables["File"] = self.dsdb.database.table("File")
+        # if "File" not in self.dsdb.schema_version.TABLES:
+        #     self.dsdb.schema_version.TABLES["File"] =\
+        #         self.dsdb.database.table("File")
 
 
     def create_File(self, schema: orator.Schema):

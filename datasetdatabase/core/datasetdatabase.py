@@ -259,7 +259,7 @@ class DatasetDatabase(object):
 
         # format return
         if self.driver == "postgres" or self.driver == "postgresql":
-            items = [dict(r) for row in items]
+            items = [dict(row) for row in items]
 
         return items
 
@@ -706,7 +706,7 @@ class DatasetDatabase(object):
                     keys = match_all.select("Iota.Key").distinct().get()
 
                     if self.driver == "postgres" or self.driver == "postgresql":
-                        keys = [dict(r)["Key"] for row in keys]
+                        keys = [dict(row)["Key"] for row in keys]
                     else:
                         keys = [i["Key"] for i in keys]
 
@@ -714,7 +714,7 @@ class DatasetDatabase(object):
                     vals = match_all.select("Iota.Value").distinct().get()
 
                     if self.driver == "postgres" or self.driver == "postgresql":
-                        vals = [dict(r)["Value"] for row in vals]
+                        vals = [dict(row)["Value"] for row in vals]
                     else:
                         vals = [i["Value"] for i in vals]
 
