@@ -14,7 +14,8 @@ RUN pip install \
     pandas \
     orator \
     pathlib \
-    psycopg2-binary
+    psycopg2-binary \
+    python-Levenshtein
 
 WORKDIR /active
 

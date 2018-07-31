@@ -2,6 +2,7 @@
 
 # installed
 from datetime import datetime
+import Levenshtein as leven
 from typing import Union
 import pandas as pd
 import numpy as np
@@ -40,12 +41,16 @@ STANDARD_UPLOAD_PARAMS = {"name": None,
                           "force_storage": False,
                           "filepath_columns": None,
                           "replace_paths": UNIX_REPLACE}
+SEARCH_WEIGHTS = {"Name": 0.33,
+                  "Description": 0.33,
+                  "FilepathColumns": 0.33,
+                  "Keys": 0.5,
+                  "Values": 0.5}
 
 # bad, but until someone tells me how to fix [671]:
 #   dataset[col][i] = self.fms.get_readpath_from_fileid(f_id)
 # i dont know what else to do
 pd.options.mode.chained_assignment = None  # default='warn'
-
 
 # TODO:
 # documentation for:
@@ -659,25 +664,163 @@ class DatasetDatabase(object):
         if isinstance(seq, str):
             seq = seq.split(sep)
 
-        # create combinations
-        if all_combinations_search:
-            seq = itertools.combinations(seq)
-
-        print(seq)
-
         # scores object
-        scores = {}
+        scores = []
 
         # datasets
         datasets = self.get_items_from_table("Dataset")
 
-        # # compute scores
-        # for ds in datasets:
-        #     score = 0.0
-        #
-        #     for word in seq:
+        # get combinations
+        if all_combinations_search:
+            combs = []
+            for i in range(len(seq)):
+                combs += itertools.combinations(seq, i+1)
 
-        print(list(datasets))
+            seq = [list(c) for c in combs]
+
+        # force structure on seq
+        else:
+            seq = [[w] for w in seq]
+
+        # compute scores
+        for ds in datasets:
+            score = 0.0
+
+            weight_name = SEARCH_WEIGHTS["Name"]
+            weight_desc = SEARCH_WEIGHTS["Description"]
+            weight_fpcols = SEARCH_WEIGHTS["FilepathColumns"]
+
+            if ds["FilepathColumns"] is None:
+                weight_desc *= 2
+
+            if search_keys or search_values:
+                match_all = self.database.table("Dataset")
+                match_all = match_all.where("Dataset.DatasetId", "=",
+                                            ds["DatasetId"])
+                match_all = match_all.join("IotaDatasetJunction",
+                    "Dataset.DatasetId", "=", "IotaDatasetJunction.DatasetId")
+                match_all = match_all.join("Iota",
+                    "Iota.IotaId", "=", "IotaDatasetJunction.IotaId")
+
+                if search_keys:
+                    keys = match_all.select("Iota.Key").distinct().get()
+
+                    if self.driver == "postgres" or self.driver == "postgresql":
+                        keys = [dict(r)["Key"] for row in keys]
+                    else:
+                        keys = [i["Key"] for i in keys]
+
+                if search_values:
+                    vals = match_all.select("Iota.Value").distinct().get()
+
+                    if self.driver == "postgres" or self.driver == "postgresql":
+                        vals = [dict(r)["Value"] for row in vals]
+                    else:
+                        vals = [i["Value"] for i in vals]
+
+            for sub in seq:
+                joined = " ".join(sub)
+
+                if joined in ds["Name"]:
+                    name_dist = leven.distance(ds["Name"], joined)
+                    name_score = float(name_dist) / len(ds["Name"])
+                    name_score = (1 - name_score)\
+                                    * weight_name\
+                                    * len(sub)
+                else:
+                    added_from_set = 1
+                    for i, word in enumerate(sub):
+                        if word in ds["Name"]:
+                            added_from_set += 1
+                        name_dist = leven.distance(ds["Name"], word)
+                        name_score = float(name_dist) / len(ds["Name"])
+                        name_score = (1 - name_score)\
+                                        * weight_name\
+                                        * (1 / len(sub))\
+                                        * (added_from_set / len(sub))
+
+                score += name_score
+
+                desc_score = 0.0
+                if ds["Description"] is not None:
+                    desc = ds["Description"]
+
+                    if joined in desc:
+                        desc_dist = leven.distance(desc, joined)
+                        desc_score = float(desc_dist) / len(desc)
+                        desc_score = (1 - desc_score)\
+                                        * weight_desc\
+                                        * len(sub)
+                    else:
+                        added_from_set = 1
+                        for i, word in enumerate(sub):
+                            if word in desc:
+                                added_from_set += 1
+                            desc_dist = leven.distance(desc, word)
+                            desc_score = float(desc_dist) / len(desc)
+                            desc_score = (1 - desc_score)\
+                                            * weight_desc\
+                                            * (1 / len(sub))\
+                                            * (added_from_set / len(sub))
+
+                score += desc_score
+
+                fpcol_score = 0.0
+                if ds["FilepathColumns"] is not None:
+                    fpcols = " ".join(ds["FilepathColumns"])
+                    if joined in fpcols:
+                        fpcol_dist = leven.distance(fpcols, joined)
+                        fpcol_score = float(fpcol_dist) / len(fpcols)
+                        fpcol_score = (1 - fpcol_score)\
+                                        * weight_fpcols\
+                                        * len(sub)
+                    else:
+                        added_from_set = 1
+                        for i, word in enumerate(sub):
+                            if word in desc:
+                                added_from_set += 1
+                            fpcol_dist = leven.distance(fpcols, word)
+                            fpcol_score = float(fpcol_dist) / len(fpcols)
+                            fpcol_score = (1 - fpcol_score)\
+                                            * weight_fpcols\
+                                            * (1 / len(sub))\
+                                            * (added_from_set / len(sub))
+
+                score += fpcol_score
+
+                key_score = 0.0
+                if search_keys:
+                    added_from_set = 1
+                    for i, word in enumerate(sub):
+                        if word in desc:
+                            added_from_set += 1
+                        key_dist = leven.distance(fpcols, word)
+                        key_score = float(key_dist) / len(fpcols)
+                        key_score = (1 - key_score)\
+                                        * weight_fpcols\
+                                        * (1 / len(sub))\
+                                        * (added_from_set / len(sub))
+
+                val_score = 0.0
+                if search_values:
+                    added_from_set = 1
+                    for i, word in enumerate(sub):
+                        if word in desc:
+                            added_from_set += 1
+                        val_dist = leven.distance(fpcols, word)
+                        val_score = float(val_dist) / len(fpcols)
+                        val_score = (1 - val_score)\
+                                        * weight_fpcols\
+                                        * (1 / len(sub))\
+                                        * (added_from_set / len(sub))
+
+            scores.append({"score": score, "ds_info": ds})
+            scores = sorted(scores, key=lambda x: x["score"], reverse=True)
+
+        for result in scores[:5]:
+            print(result["ds_info"]["Name"], result["score"])
+
+        # print(list(datasets))
 
 
     def process_run(self,
