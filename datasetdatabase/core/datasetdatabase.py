@@ -260,11 +260,13 @@ class DatasetDatabase(object):
         # format return
         if self.driver == "postgres" or self.driver == "postgresql":
             items = [dict(row) for row in items]
+        else:
+            items = items.all()
 
         return items
 
 
-    def insert_to_table(self, table: str, items: dict) -> dict:
+    def _insert_to_table(self, table: str, items: dict) -> dict:
         """
         Insert items into a table. If the item already exists given the unique
         contraints, it will return the found object.
@@ -423,7 +425,7 @@ class DatasetDatabase(object):
         # create or get user
         user_info = self.get_items_from_table("User", ["Name", "=", name])
         if len(user_info) == 0:
-            user_info = self.insert_to_table("User",
+            user_info = self._insert_to_table("User",
                             {"Name": name,
                              "Description": description,
                              "Created": datetime.now()})
@@ -528,7 +530,7 @@ class DatasetDatabase(object):
         alg_info = self.get_items_from_table("Algorithm",
             [["Name", "=", name], ["Version", "=", version]])
         if len(alg_info) == 0:
-            alg_info = self.insert_to_table("Algorithm",
+            alg_info = self._insert_to_table("Algorithm",
             {"Name": name,
              "Description": description,
              "Version": version,
@@ -777,7 +779,7 @@ class DatasetDatabase(object):
                     else:
                         added_from_set = 1
                         for i, word in enumerate(sub):
-                            if word in desc:
+                            if word in ds["FilepathColumns"]:
                                 added_from_set += 1
                             fpcol_dist = leven.distance(fpcols, word)
                             fpcol_score = float(fpcol_dist) / len(fpcols)
@@ -788,31 +790,31 @@ class DatasetDatabase(object):
 
                 score += fpcol_score
 
-                key_score = 0.0
-                if search_keys:
-                    added_from_set = 1
-                    for i, word in enumerate(sub):
-                        if word in desc:
-                            added_from_set += 1
-                        key_dist = leven.distance(fpcols, word)
-                        key_score = float(key_dist) / len(fpcols)
-                        key_score = (1 - key_score)\
-                                        * weight_fpcols\
-                                        * (1 / len(sub))\
-                                        * (added_from_set / len(sub))
-
-                val_score = 0.0
-                if search_values:
-                    added_from_set = 1
-                    for i, word in enumerate(sub):
-                        if word in desc:
-                            added_from_set += 1
-                        val_dist = leven.distance(fpcols, word)
-                        val_score = float(val_dist) / len(fpcols)
-                        val_score = (1 - val_score)\
-                                        * weight_fpcols\
-                                        * (1 / len(sub))\
-                                        * (added_from_set / len(sub))
+                # key_score = 0.0
+                # if search_keys:
+                #     added_from_set = 1
+                #     for i, word in enumerate(sub):
+                #         if word in keys:
+                #             added_from_set += 1
+                #         key_dist = leven.distance(key, word)
+                #         key_score = float(key_dist) / len(fpcols)
+                #         key_score = (1 - key_score)\
+                #                         * weight_fpcols\
+                #                         * (1 / len(sub))\
+                #                         * (added_from_set / len(sub))
+                #
+                # val_score = 0.0
+                # if search_values:
+                #     added_from_set = 1
+                #     for i, word in enumerate(sub):
+                #         if word in desc:
+                #             added_from_set += 1
+                #         val_dist = leven.distance(fpcols, word)
+                #         val_score = float(val_dist) / len(fpcols)
+                #         val_score = (1 - val_score)\
+                #                         * weight_fpcols\
+                #                         * (1 / len(sub))\
+                #                         * (added_from_set / len(sub))
 
             scores.append({"score": score, "ds_info": ds})
             scores = sorted(scores, key=lambda x: x["score"], reverse=True)
@@ -934,7 +936,7 @@ class DatasetDatabase(object):
         dataset_parameters["dataset"] = output_dataset
 
         # create source
-        source_info = self.insert_to_table("Source",
+        source_info = self._insert_to_table("Source",
                         {"Created": datetime.now()})
         dataset_parameters["source_info"] = source_info
         if "source_type" not in dataset_parameters:
@@ -948,7 +950,7 @@ class DatasetDatabase(object):
         end = datetime.now()
 
         # insert run info
-        run_info = self.insert_to_table("Run",
+        run_info = self._insert_to_table("Run",
                                         {"AlgorithmId": alg_info["AlgorithmId"],
                                          "UserId": user_info["UserId"],
                                          "Name": name,
@@ -958,20 +960,20 @@ class DatasetDatabase(object):
 
         # insert run input
         if input_dataset_id is not None:
-            self.insert_to_table("RunInput",
+            self._insert_to_table("RunInput",
                                  {"RunId": run_info["RunId"],
                                   "DatasetId": input_dataset_id,
                                   "Created": datetime.now()})
 
         # insert run output
-        self.insert_to_table("RunOutput",
+        self._insert_to_table("RunOutput",
                              {"RunId": run_info["RunId"],
                               "DatasetId": output_dataset_info["DatasetId"],
                               "Created": datetime.now()})
 
         # insert run source
         if dataset_parameters["source_type"] in ["RunSource"]:
-            self.insert_to_table("RunSource",
+            self._insert_to_table("RunSource",
                                  {"SourceId": source_info["SourceId"],
                                   "RunId": run_info["RunId"],
                                   "Created": datetime.now()})
@@ -1320,9 +1322,238 @@ class DatasetDatabase(object):
         return ds_info
 
 
+    def _find_dataset_connections(self,
+                                  current: dict,
+                                  connections: list = [],
+                                  depth: int = 0,
+                                  max_depth: Union[int, None] = None) \
+                                  -> list:
+
+        # use dataset id
+        if "DatasetId" in current:
+            ds_id = current["DatasetId"]
+        elif "Dataset.DatasetId" in current:
+            ds_id = current["Dataset.DatasetId"]
+        else:
+            return connections
+
+        if max_depth is None or depth <= max_depth:
+            try:
+                forward_run_ids = self.database.table("Run")\
+                .join("RunInput", "Run.RunId", "=", "RunInput.RunId")\
+                .join("Dataset",
+                      "RunInput.DatasetId", "=", "Dataset.DatasetId")\
+                .where("Dataset.DatasetId", "=", current["DatasetId"])\
+                .select("Run.RunId")\
+                .get()
+
+                for r in forward_run_ids:
+                    forward_ds = self.database.table("Run")\
+                    .join("RunOutput", "Run.RunId", "=", "RunOutput.RunId")\
+                    .join("Dataset",
+                          "RunOutput.DatasetId", "=", "Dataset.DatasetId")\
+                    .where("Run.RunId", "=", r["RunId"])\
+                    .limit(1)\
+                    .get()
+
+                    forward_alg = self.database.table("Run")\
+                    .join("Algorithm",
+                          "Run.AlgorithmId", "=", "Algorithm.AlgorithmId")\
+                    .where("Run.RunId", "=", r["RunId"])\
+                    .limit(1)\
+                    .get()
+
+                    if self.driver == "postgres" or self.driver == "postgresql":
+                        forward_ds = [dict(r) for r in forward_ds]
+                        forward_alg = [dict(r) for r in forward_alg]
+
+                    forward_ds = forward_ds[0]
+                    forward_alg = forward_alg[0]
+
+                    forward = {"from": current["Name"],
+                               "to": forward_ds["Name"],
+                               "alg": forward_alg["Name"]}
+
+                    if forward not in connections:
+                        connections.append(forward)
+
+                        connection = self._find_dataset_connections(forward_ds,
+                                                                    connections,
+                                                                    depth + 1,
+                                                                    max_depth)
+            except orator.exceptions.query.QueryException:
+                pass
+
+            try:
+                backward_run_ids = self.database.table("Run")\
+                .join("RunOutput", "Run.RunId", "=", "RunOuput.RunId")\
+                .join("Dataset",
+                      "RunOutput.DatasetId", "=", "Dataset.DatasetId")\
+                .where("Dataset.DatasetId", "=", current["DatasetId"])\
+                .select("Run.RunId")\
+                .get()
+
+                for r in backward_run_ids:
+                    backward_ds = self.database.table("Run")\
+                    .join("RunInput", "Run.RunId", "=", "RunInput.RunId")\
+                    .join("Dataset",
+                          "RunInput.DatasetId", "=", "Dataset.DatasetId")\
+                    .where("Run.RunId", "=", r["RunId"])\
+                    .limit(1)\
+                    .get()
+
+                    backward_alg = self.database.table("Run")\
+                    .join("Algorithm",
+                          "Run.AlgorithmId", "=", "Algorithm.AlgorithmId")\
+                    .where("Run.RunId", "=", r["RunId"])\
+                    .limit(1)\
+                    .get()
+
+                    if self.driver == "postgres" or self.driver == "postgresql":
+                        backward_ds = [dict(r) for r in backward_ds]
+                        backward_alg = [dict(r) for r in backward_alg]
+
+                    backward_ds = backward_ds[0]
+                    backward_alg = backward_alg[0]
+
+                    backward = {"from": current["Name"],
+                               "to": backward_ds["Name"],
+                               "alg": backward_alg["Name"]}
+
+                    if backward not in connections:
+                        connections.append(backward)
+
+                        connection = self._find_dataset_connections(backward_ds,
+                                                                    connections,
+                                                                    depth + 1,
+                                                                    max_depth)
+            except orator.exceptions.query.QueryException:
+                pass
+
+        return connections
+
+
+    def get_dataset_connections(self,
+                                id: Union[int, None] = None,
+                                name: Union[str, None] = None,
+                                sourceid: Union[int, None] = None,
+                                max_distance: Union[int, None] = None) \
+                                -> pd.DataFrame:
+
+        # enforce types
+        checks.check_types(id, [int, type(None)])
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(sourceid, [int, type(None)])
+        checks.check_types(max_distance, [int, type(None)])
+
+        # must provide id or name
+        assert id is not None or name is not None or sourceid is not None, \
+            "Must provide dataset id, name, or source id."
+
+        # get ds_info_target
+        if id is not None:
+            origin = self.get_items_from_table("Dataset",
+                                               ["DatasetId", "=", id])
+        elif name is not None:
+            origin = self.get_items_from_table("Dataset",
+                                               ["Name", "=", name])
+        else:
+            origin = self.get_items_from_table("Dataset",
+                                               ["SourceId", "=", sourceid])
+
+        # exists
+        assert len(origin) > 0, \
+        "Dataset with that name, id, or source does not exist."
+
+        origin = origin[0]
+        # recursive find
+        connections = self._find_dataset_connections(origin)
+
+        connections = pd.DataFrame(connections)
+
+        return connections
+
+
+    def display_dataset_graph(self,
+                              id: Union[int, None] = None,
+                              name: Union[str, None] = None,
+                              sourceid: Union[int, None] = None,
+                              max_distance: Union[int, None] = None) \
+                              -> pd.DataFrame:
+
+        # import now due to display functions
+        import matplotlib.pyplot as plt
+        import networkx as nx
+
+        connections = self.get_dataset_connections(id,
+                                                   name,
+                                                   sourceid,
+                                                   max_distance)
+
+        G = nx.from_pandas_edgelist(connections,
+                                     "from",
+                                     "to",
+                                     "alg")
+        nx.draw(G, with_labels=True)
+        plt.show()
+
+
     def _upload_dataset(self, input, params: dict) -> pd.DataFrame:
         # just return
         return params["dataset"]
+
+
+    def _create_iota(self,
+                     row: pd.Series,
+                     start_time: float,
+                     total_upload: int,
+                     id_obj: dict):
+
+        # current row
+        groupid = row.name
+
+        key_index = 0
+        index = (groupid + 1) * key_index
+
+        # update progress
+        tools.print_progress(count=index,
+                             start_time=start_time,
+                             total=total_upload)
+
+        # parse row
+        r = dict(row)
+        for key, value in r.items():
+            if isinstance(value, str):
+                value = value.replace("\n", "")
+
+            # basic items
+            to_add = {"GroupId": int(groupid),
+                      "Key": str(key),
+                      "Value": str(value),
+                      "ValueType": str(type(value)),
+                      "Created": datetime.now()}
+
+            # create extra ndarray iota
+            if isinstance(value, np.ndarray):
+                arr_info = dict(to_add)
+                to_add["Value"] = np.array_str(value.flatten(),
+                                               precision=24)
+                arr_info["Key"] = str(key) + "(Reshape)"
+                arr_info["Value"] = str(value.shape)
+                arr_info["ValueType"] = str(type(value.shape))
+
+                iota_info = self._insert_to_table("Iota", arr_info)
+                id_obj[iota_info["IotaId"]] = arr_info
+
+            iota_info = self._insert_to_table("Iota", to_add)
+            id_obj[iota_info["IotaId"]] = to_add
+
+            key_index += 1
+            index = (groupid + 1) * key_index
+            # update progress
+            tools.print_progress(count=index,
+                                 start_time=start_time,
+                                 total=total_upload)
 
 
     def _create_dataset(self, params) -> dict:
@@ -1359,7 +1590,7 @@ class DatasetDatabase(object):
         # create or get user
         user_info = self.get_items_from_table("User", ["Name", "=", self.user])
         if len(user_info) == 0:
-            user_info = self.insert_to_table("User",
+            user_info = self._insert_to_table("User",
                             {"Name": self.user,
                              "Created": datetime.now()})
         else:
@@ -1436,13 +1667,13 @@ class DatasetDatabase(object):
 
         # create or get file source
         if source_type == "FileSource":
-            source_type_info = self.insert_to_table("FileSource",
+            source_type_info = self._insert_to_table("FileSource",
                             {"FileId": source_type_id,
                              "SourceId": source_info["SourceId"],
                              "Created": now})
         # get or create quilt source
         elif source_type == "QuiltSource":
-            source_type_info = self.insert_to_table("QuiltSource",
+            source_type_info = self._insert_to_table("QuiltSource",
                             {"PackageString": source_type_id,
                              "SourceId": source_info["SourceId"],
                              "Created": now})
@@ -1454,52 +1685,15 @@ class DatasetDatabase(object):
         print("\nCreating Iota...")
 
         iota = {}
-        current_i = 0
         start_time = time.time()
         total_upload = (len(dataset) * len(dataset.columns))
-        for groupid, row in dataset.iterrows():
-            # update progress
-            tools.print_progress(count=current_i,
-                                 start_time=start_time,
-                                 total=total_upload)
-
-            # parse row
-            r = dict(row)
-            for key, value in r.items():
-                if isinstance(value, str):
-                    value = value.replace("\n", "")
-
-                # basic items
-                to_add = {"GroupId": groupid,
-                          "Key": str(key),
-                          "Value": str(value),
-                          "ValueType": str(type(value)),
-                          "Created": datetime.now()}
-
-                # create extra ndarray iota
-                if isinstance(value, np.ndarray):
-                    arr_info = dict(to_add)
-                    to_add["Value"] = np.array_str(value.flatten(),
-                                                   precision=24)
-                    arr_info["Key"] = str(key) + "(Reshape)"
-                    arr_info["Value"] = str(value.shape)
-                    arr_info["ValueType"] = str(type(value.shape))
-
-                    iota_info = self.insert_to_table("Iota", arr_info)
-                    iota[iota_info["IotaId"]] = arr_info
-
-                iota_info = self.insert_to_table("Iota", to_add)
-                iota[iota_info["IotaId"]] = to_add
-
-
-                # update progress
-                current_i += 1
-                tools.print_progress(count=current_i,
-                                     start_time=start_time,
-                                     total=total_upload)
+        dataset.apply(lambda row: self._create_iota(row,
+                                                    start_time,
+                                                    total_upload,
+                                                    iota), axis=1)
 
         # create dataset
-        dataset_info = self.insert_to_table("Dataset",
+        dataset_info = self._insert_to_table("Dataset",
             {"Name": name,
              "Description": description,
              "SourceId": source_info["SourceId"],
@@ -1514,7 +1708,7 @@ class DatasetDatabase(object):
         current_i = 0
         start_time = time.time()
         total_upload = len(iota)
-        for iota_id in iota.keys():
+        for iota_id in iota:
             # update progress
             tools.print_progress(count=current_i,
                                  start_time=start_time,
@@ -1526,7 +1720,7 @@ class DatasetDatabase(object):
                 "Created": datetime.now()}
 
             # insert junction item
-            self.insert_to_table("IotaDatasetJunction", junction_item)
+            self._insert_to_table("IotaDatasetJunction", junction_item)
 
             # update progress
             current_i += 1

@@ -181,7 +181,7 @@ class FMS(object):
                                                 "." +
                                                 name)
 
-        file_info = self.dsdb.insert_to_table("File",
+        file_info = self.dsdb._insert_to_table("File",
                                         {"OriginalFilepath": str(filepath),
                                          "Filetype": filepath.suffix\
                                                      .replace(".", ""),

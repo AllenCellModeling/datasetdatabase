@@ -338,27 +338,18 @@ def validate_dataset_types(dataset: pd.DataFrame,
 
     # enforce data types
     if type_map is not None:
-        for key in type_map:
+        for key, ctype in type_map.items():
             err = t_err.format(c=key)
-            dataset[key].apply(lambda x: check_types(x, type_map[key], err=err))
+            dataset[key].apply(lambda x: check_types(x, ctype, err=err))
+
     if filepath_columns is not None:
         for key in filepath_columns:
             err = fp_err.format(c=key)
             dataset[key].apply(lambda x: check_file_exists(x, err=err))
 
-        # filepath_columns is not None:
-        # if type_map is not None:
-        #
-        # for i, row in dataset.iterrows():
-        #     for key, value in dict(row).items():
-        #         if type_map is not None:
-        #             if key in type_map:
-        #                 err = err.format(c=key, r=i)
-        #                 check_types(value, type_map[key], err=err)
-        #
-        #         if filepath_columns is not None:
-        #             if key in filepath_columns:
-        #                 check_file_exists(pathlib.Path(value))
+
+def _assert_values(func, val, err):
+    assert func(val), err
 
 
 def validate_dataset_values(dataset: pd.DataFrame,
@@ -368,11 +359,11 @@ def validate_dataset_values(dataset: pd.DataFrame,
     check_types(validation_map, [dict, type(None)])
 
     # standard error
-    err = "Dataset failed data check at:\n\tcol:{c}\n\tvalue:{v}"
+    err = "Dataset failed data check at:\n\tcol:{c}"
 
     # enforce all dataset values to meet the lambda requirements
     if validation_map is not None:
-        for i, row in dataset.iterrows():
-            for k, v in dict(row).items():
-                if k in validation_map:
-                    assert validation_map[k](v), err.format(k=k, i=i, v=v)
+        for key, func in validation_map.items():
+            dataset[key].apply(lambda x: _assert_values(func,
+                                                        x,
+                                                        err.format(c=key)))

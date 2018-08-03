@@ -14,6 +14,8 @@ RUN pip install \
     pandas \
     orator \
     pathlib \
+    networkx \
+    matplotlib \
     psycopg2-binary \
     python-Levenshtein
 

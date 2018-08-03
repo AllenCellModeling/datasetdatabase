@@ -103,6 +103,34 @@ def format_paths(dataset: pd.DataFrame,
     return dataset
 
 
+def _create_dataframe_rows(row: pd.Series,
+                           created_rows: dict,
+                           get_info_items: bool,
+                           **kwargs):
+    items = dict(row)
+
+    # basic items
+    group = {items["Key"]: cast(items["Value"],
+                                items["ValueType"],
+                                **kwargs)}
+
+    # info items
+    if get_info_items:
+        group[(items["Key"] + "(Type)")] = items["ValueType"]
+        group[(items["Key"] + "(IotaId)")] = items["IotaId"]
+        group[(items["Key"] + "(SourceId)")] = items["SourceId"]
+        group[(items["Key"] + "(SourceTypeId)")] = items["SourceTypeId"]
+
+    # first item of row
+    if items["GroupId"] not in created_rows:
+        created_rows[items["GroupId"]] = group
+
+    # additional items of already created row
+    else:
+        for key, item in group.items():
+            created_rows[items["GroupId"]][key] = item
+
+
 def convert_dataset_to_dataframe(dataset: pd.DataFrame,
                                  get_info_items: bool = False,
                                  **kwargs) -> pd.DataFrame:
@@ -113,29 +141,10 @@ def convert_dataset_to_dataframe(dataset: pd.DataFrame,
 
     # join each Iota row into a dataframe row
     rows = {}
-    for i, row in dataset.iterrows():
-        items = dict(row)
-
-        # basic items
-        group = {items["Key"]: cast(items["Value"],
-                                    items["ValueType"],
-                                    **kwargs)}
-
-        # info items
-        if get_info_items:
-            group[(items["Key"] + "(Type)")] = items["ValueType"]
-            group[(items["Key"] + "(IotaId)")] = items["IotaId"]
-            group[(items["Key"] + "(SourceId)")] = items["SourceId"]
-            group[(items["Key"] + "(SourceTypeId)")] = items["SourceTypeId"]
-
-        # first item of row
-        if items["GroupId"] not in rows:
-            rows[items["GroupId"]] = group
-
-        # additional items of already created row
-        else:
-            for key, item in group.items():
-                rows[items["GroupId"]][key] = item
+    dataset.apply(lambda row: _create_dataframe_rows(row,
+                                                     rows,
+                                                     get_info_items,
+                                                     **kwargs), axis=1)
 
     # format dataframe
     rows = list(rows.values())
