@@ -1230,7 +1230,7 @@ class DatasetDatabase(object):
             yaml.dump(node, write_out, default_flow_style=False)
 
         # create quilt node
-        full_pkg_name = quilt_user + "/" + ds_info["Name"]
+        full_pkg_name = quilt_user + "/" + ds_info["Name"].replace(" ", "_")
         with tools.suppress_prints():
             quilt.build(full_pkg_name, str(temp_write_loc))
 

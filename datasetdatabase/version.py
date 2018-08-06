@@ -67,6 +67,7 @@ REQUIRES = ["numpy",
             "pandas",
             "orator",
             "pathlib",
+            "sqlalchemy",
             "psycopg2_binary",
             "python_Levenshtein"]
 SCRIPTS = []

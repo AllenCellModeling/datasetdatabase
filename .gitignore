@@ -8,7 +8,6 @@ datasetdatabase.egg-info/
 # specific folders
 configs/
 fp_example/
-talks/
 
 # generated files
 .DS_STORE
