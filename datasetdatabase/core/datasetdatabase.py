@@ -955,6 +955,8 @@ class DatasetDatabase(object):
                                          "UserId": user_info["UserId"],
                                          "Name": name,
                                          "Description": description,
+                                         "AlgorithmParameters":
+                                            str(alg_parameters),
                                          "Begin": begin,
                                          "End": end})
 
@@ -1152,7 +1154,8 @@ class DatasetDatabase(object):
                         columns: Union[str, list, None] = None,
                         filepath_columns: Union[str, list, None] = None,
                         get_info_items: bool = False,
-                        quilt_user: str = "dsdb") -> str:
+                        quilt_user: str = "dsdb",
+                        quilt_package_name: Union[str, None] = None) -> str:
 
         # enforce types
         checks.check_types(id, [int, type(None)])
@@ -1162,6 +1165,7 @@ class DatasetDatabase(object):
         checks.check_types(filepath_columns, [str, list, type(None)])
         checks.check_types(get_info_items, bool)
         checks.check_types(quilt_user, str)
+        checks.check_types(quilt_package_name, [str, type(None)])
 
         # must provide id or name
         assert id is not None or name is not None or sourceid is not None, \
@@ -1230,7 +1234,11 @@ class DatasetDatabase(object):
             yaml.dump(node, write_out, default_flow_style=False)
 
         # create quilt node
-        full_pkg_name = quilt_user + "/" + ds_info["Name"].replace(" ", "_")
+        if quilt_package_name is not None:
+            full_pkg_name = quilt_user + "/" + quilt_package_name
+        else:
+            full_pkg_name = quilt_user + "/" + ds_info["Name"].replace(" ", "_")
+
         with tools.suppress_prints():
             quilt.build(full_pkg_name, str(temp_write_loc))
 
@@ -1417,15 +1425,15 @@ class DatasetDatabase(object):
                     backward_alg = backward_alg[0]
 
                     backward = {"from": current["Name"],
-                               "to": backward_ds["Name"],
-                               "alg": backward_alg["Name"]}
+                                "to": backward_ds["Name"],
+                                "alg": backward_alg["Name"]}
 
                     if backward not in connections:
                         connections.append(backward)
 
                         connection = self._find_dataset_connections(backward_ds,
                                                                     connections,
-                                                                    depth + 1,
+                                                                    depth - 1,
                                                                     max_depth)
             except orator.exceptions.query.QueryException:
                 pass
@@ -1490,11 +1498,13 @@ class DatasetDatabase(object):
                                                    sourceid,
                                                    max_distance)
 
+
         G = nx.from_pandas_edgelist(connections,
                                      "from",
                                      "to",
-                                     "alg")
-        nx.draw(G, with_labels=True)
+                                     create_using=nx.DiGraph())
+        pos = nx.layout.spring_layout(G)
+        nx.draw(G, pos, with_labels=True, width=2, arrowsize=20)
         plt.show()
 
 
@@ -1580,7 +1590,7 @@ class DatasetDatabase(object):
         if name is None:
             dataset = dataset.copy()
             ds_path = tools.create_pickle_file(dataset)
-            name = self.fms.get_hash(ds_path)
+            name = "hash_" + self.fms.get_hash(ds_path)
             os.remove(ds_path)
 
         # convert types

@@ -145,6 +145,7 @@ def create_Run(schema: orator.Schema):
             table.integer("UserId").unsigned()
             table.string("Name").nullable()
             table.string("Description").nullable()
+            table.string("AlgorithmParameters").nullable()
             table.datetime("Begin")
             table.datetime("End")
             table.foreign("AlgorithmId") \
