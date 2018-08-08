@@ -31,6 +31,7 @@ from ..utils import tools
 
 # globals
 UNIX_REPLACE = {"\\": "/"}
+COMPLEX_TYPES = (pd.DataFrame, np.ndarray)
 DUPLICATE_DATA_CONFIRM = "Duplicate a maximum of {s} of data? (y / n) "
 STANDARD_UPLOAD_PARAMS = {"name": None,
                           "description": None,
@@ -949,6 +950,8 @@ class DatasetDatabase(object):
         # end time
         end = datetime.now()
 
+        processed_alg_parameters = self._reduce_complex_types(alg_parameters)
+
         # insert run info
         run_info = self._insert_to_table("Run",
                                         {"AlgorithmId": alg_info["AlgorithmId"],
@@ -956,7 +959,7 @@ class DatasetDatabase(object):
                                          "Name": name,
                                          "Description": description,
                                          "AlgorithmParameters":
-                                            str(alg_parameters),
+                                            str(processed_alg_parameters),
                                          "Begin": begin,
                                          "End": end})
 
@@ -981,6 +984,28 @@ class DatasetDatabase(object):
                                   "Created": datetime.now()})
 
         return output_dataset_info
+
+
+    def _reduce_complex_types(self, params: dict) -> dict:
+        checks.check_types(params, dict)
+
+        reductions = {}
+
+        for key, item in params.items():
+            val_to_store = item
+            if isinstance(item, COMPLEX_TYPES):
+                if isinstance(item, pd.DataFrame):
+                    item_path = tools.create_pickle_file(item)
+                elif isinstance(item, np.ndarray):
+                    item_path = tools.create_npy_file(item)
+
+                file_info = self.fms.get_or_create_file(item_path)
+                val_to_store = file_info["ReadPath"]
+                os.remove(item_path)
+
+            reductions[key] = val_to_store
+
+        return reductions
 
 
     def form_dataset(self, iotas: list) -> dict:
@@ -1433,7 +1458,7 @@ class DatasetDatabase(object):
 
                         connection = self._find_dataset_connections(backward_ds,
                                                                     connections,
-                                                                    depth - 1,
+                                                                    depth + 1,
                                                                     max_depth)
             except orator.exceptions.query.QueryException:
                 pass
@@ -1497,6 +1522,9 @@ class DatasetDatabase(object):
                                                    name,
                                                    sourceid,
                                                    max_distance)
+
+        if len(connections) == 0:
+            return None
 
 
         G = nx.from_pandas_edgelist(connections,
