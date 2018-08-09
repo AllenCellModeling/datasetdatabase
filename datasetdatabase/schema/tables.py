@@ -29,12 +29,22 @@ def create_Iota(schema: orator.Schema):
     if not schema.has_table("Iota"):
         with schema.create("Iota") as table:
             table.big_increments("IotaId")
-            table.integer("GroupId")
             table.string("Key", 50)
-            table.string("Value")
+            table.binary("Value")
             table.string("ValueType")
             table.datetime("Created")
             table.unique(["GroupId", "Key", "Value", "ValueType"])
+
+
+def create_Group(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("Group"):
+        with schema.create("Group") as table:
+            table.increments("GroupId")
+            table.datetime("Created")
 
 
 def create_Source(schema: orator.Schema):
@@ -89,7 +99,7 @@ def create_Dataset(schema: orator.Schema):
         with schema.create("Dataset") as table:
             table.increments("DatasetId")
             table.string("Name").unique()
-            table.string("Description").nullable()
+            table.text("Description").nullable()
             table.integer("SourceId").unsigned()
             table.string("FilepathColumns").nullable()
             table.datetime("Created")
@@ -97,22 +107,40 @@ def create_Dataset(schema: orator.Schema):
                  .references("SourceId") \
                  .on("Source")
 
-
-def create_IotaDatasetJunction(schema: orator.Schema):
+def create_IotaGroupJunction(schema: orator.Schema):
     # enforce types
     checks.check_types(schema, orator.Schema)
 
     # create table
-    if not schema.has_table("IotaDatasetJunction"):
-        with schema.create("IotaDatasetJunction") as table:
-            table.increments("IotaDatasetJunctionId")
+    if not schema.has_table("IotaGroupJunction"):
+        with schema.create("IotaGroupJunction") as table:
+            table.increments("IotaGroupJunctionId")
             table.integer("IotaId").unsigned()
-            table.integer("DatasetId").unsigned()
+            table.integer("GroupId").unsigned()
             table.datetime("Created")
-            table.unique(["IotaId", "DatasetId"])
+            table.unique(["IotaId", "GroupId"])
             table.foreign("IotaId") \
                  .references("IotaId") \
                  .on("Iota")
+            table.foreign("GroupId") \
+                 .references("GroupId") \
+                 .on("Group")
+
+def create_GroupDatasetJunction(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("GroupDatasetJunction"):
+        with schema.create("GroupDatasetJunction") as table:
+            table.increments("GroupDatasetJunctionId")
+            table.integer("GroupId").unsigned()
+            table.integer("DatasetId").unsigned()
+            table.datetime("Created")
+            table.unique(["GroupId", "DatasetId"])
+            table.foreign("GroupId") \
+                 .references("GroupId") \
+                 .on("Group")
             table.foreign("DatasetId") \
                  .references("DatasetId") \
                  .on("Dataset")

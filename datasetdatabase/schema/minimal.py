@@ -13,11 +13,13 @@ from ..utils import checks
 # CREATION ORDER OF TABLES MATTERS
 TABLES = {"User": tables.create_User,
           "Iota": tables.create_Iota,
+          "Group": tables.create_Group,
           "Source": tables.create_Source,
           "FileSource": tables.create_FileSource,
           "QuiltSource": tables.create_QuiltSource,
           "Dataset": tables.create_Dataset,
-          "IotaDatasetJunction": tables.create_IotaDatasetJunction,
+          "IotaGroupJunction": tables.create_IotaGroupJunction,
+          "GroupDatasetJunction": tables.create_GroupDatasetJunction,
           "Algorithm": tables.create_Algorithm,
           "Run": tables.create_Run,
           "RunInput": tables.create_RunInput,
@@ -25,69 +27,49 @@ TABLES = {"User": tables.create_User,
           "RunSource": tables.create_RunSource}
 
 
-def create_schema(db):
-    for tbl, func in TABLES.items():
-        func(db.schema)
-        db.tables[tbl] = db.database.table(tbl)
+class SchemaVersion(object):
+
+    def __init__(self, dsdb):
+        self.dsdb = dsdb
+        self.tables = TABLES
 
 
-def drop_schema(db):
-    drop_order = list(TABLES.keys())
-    drop_order.reverse()
-
-    for tbl in drop_order:
-        db.schema.drop_if_exists(tbl)
-        try:
-            db.tables.pop(tbl)
-        except KeyError:
-            pass
+    def create_schema(self):
+        for tbl, func in TABLES.items():
+            func(self.dsdb.schema)
+            self.dsdb.tables[tbl] = self.dsdb.database.table(tbl)
 
 
-def add_basic_info(db):
-    return None
-    # now = datetime.now()
-    #
-    # # add SourceType
-    # try:
-    #     db.database.table("SourceType").insert([
-    #         {"Name": "FileSource",
-    #          "Description": "Id attached should be read using FMS get.",
-    #          "Created": now},
-    #         {"Name": "RunSource",
-    #          "Description": "Id attached should be read using dataset get.",
-    #          "Created": now}
-    #     ])
-    # except Exception as e:
-    #     checks.check_ingest_error(e)
+    def drop_schema(self):
+        drop_order = list(TABLES.keys())
+        drop_order.reverse()
 
-    # add dsdb Algorithms
-    # try:
-    #     db.database.table("Algorithm").insert([
-    #         {"Name": "upload_dataset",
-    #          "Version": __version__,
-    #          "Description": "DatasetDatabase ingest function",
-    #          "Created": now},
-    #         {"Name": "create_dataset",
-    #          "Version": __version__,
-    #          "Description": "DatasetDatabase create function",
-    #          "Created": now}
-    #     ])
-    # except Exception as e:
-    #     checks.check_ingest_error(e)
+        for tbl in drop_order:
+            self.dsdb.schema.drop_if_exists(tbl)
+            try:
+                self.dsdb.tables.pop(tbl)
+            except KeyError:
+                pass
+
+        self.dsdb.fms.handle_drop_schema()
 
 
-def get_tables(db):
-    if db.driver == "sqlite":
-        names = db.database.table("sqlite_master") \
-                           .select("name") \
-                           .where("type", "=", "table").get()
-        names = [t["name"] for t in names if t["name"] != "sqlite_sequence"]
-    else:
-        names = db.database.table("pg_catalog.pg_tables") \
-                           .select("tablename") \
-                           .where("schemaname", "=", "public").get()
+    def add_basic_info(self):
+        return None
 
-        names = [dict(t)["tablename"] for t in names]
-        names = [n for n in names if n in TABLES]
 
-    return {n: db.database.table(n) for n in names}
+    def get_tables(self):
+        if self.dsdb.driver == "sqlite":
+            names = self.dsdb.database.table("sqlite_master") \
+                               .select("name") \
+                               .where("type", "=", "table").get()
+            names = [t["name"] for t in names if t["name"] != "sqlite_sequence"]
+        else:
+            names = self.dsdb.database.table("pg_catalog.pg_tables") \
+                               .select("tablename") \
+                               .where("schemaname", "=", "public").get()
+
+            names = [dict(t)["tablename"] for t in names]
+            names = [n for n in names if n in TABLES]
+
+        return {n: self.dsdb.database.table(n) for n in names}

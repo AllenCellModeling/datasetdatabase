@@ -110,16 +110,14 @@ def _create_dataframe_rows(row: pd.Series,
     items = dict(row)
 
     # basic items
-    group = {items["Key"]: cast(items["Value"],
-                                items["ValueType"],
-                                **kwargs)}
+
+    group = {items["Key"]: items["Value"]}
 
     # info items
     if get_info_items:
         group[(items["Key"] + "(Type)")] = items["ValueType"]
         group[(items["Key"] + "(IotaId)")] = items["IotaId"]
         group[(items["Key"] + "(SourceId)")] = items["SourceId"]
-        group[(items["Key"] + "(SourceTypeId)")] = items["SourceTypeId"]
 
     # first item of row
     if items["GroupId"] not in created_rows:
@@ -147,17 +145,17 @@ def convert_dataset_to_dataframe(dataset: pd.DataFrame,
                                                      **kwargs), axis=1)
 
     # format dataframe
-    rows = list(rows.values())
-    rshp = "(Reshape)"
-    reshape_cols = [c.replace(rshp, "") for c in rows[0].keys() if rshp in c]
+    # rows = list(rows.values())
+    # rshp = "(Reshape)"
+    # reshape_cols = [c.replace(rshp, "") for c in rows[0].keys() if rshp in c]
 
-    if len(reshape_cols) > 0:
-        for row in rows:
-            for key, val in row.items():
-                if key in reshape_cols:
-                    row[key] = np.reshape(val, row[key + rshp])
-
-    reshape_cols = [c + rshp for c in reshape_cols]
+    # if len(reshape_cols) > 0:
+    #     for row in rows:
+    #         for key, val in row.items():
+    #             if key in reshape_cols:
+    #                 row[key] = np.reshape(val, row[key + rshp])
+    #
+    # reshape_cols = [c + rshp for c in reshape_cols]
 
     # return formatted
-    return pd.DataFrame(rows).drop(columns=reshape_cols)
+    return pd.DataFrame(rows).T

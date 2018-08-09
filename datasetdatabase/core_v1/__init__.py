@@ -1,3 +1,4 @@
 from .connectionmanager import ConnectionManager
 from .datasetdatabase import DatasetDatabase
-from .connections import *
+from .dataset import Dataset
+from .connections import LOCAL

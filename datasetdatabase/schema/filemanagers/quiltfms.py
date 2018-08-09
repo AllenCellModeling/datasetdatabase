@@ -63,9 +63,6 @@ class FMS(object):
         # update table map
         if "File" not in self.dsdb.tables:
             self.dsdb.tables["File"] = self.dsdb.database.table("File")
-        # if "File" not in self.dsdb.schema_version.TABLES:
-        #     self.dsdb.schema_version.TABLES["File"] =\
-        #         self.dsdb.database.table("File")
 
 
     def create_File(self, schema: orator.Schema):
@@ -83,6 +80,15 @@ class FMS(object):
                 table.string("QuiltPackage").unique()
                 table.string("Metadata").nullable()
                 table.datetime("Created")
+
+
+    def handle_drop_schema(self):
+        # drop the file table
+        self.dsdb.schema.drop_if_exists("File")
+        try:
+            self.dsdb.tables.pop("File")
+        except KeyError:
+            pass
 
 
     def set_storage_location(self,

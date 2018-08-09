@@ -34,6 +34,77 @@ def suppress_prints():
             sys.stdout = old_stdout
 
 
+class ProgressBar(object):
+    """
+    Print a progress bar to the console.
+    Credit: https://gist.github.com/vladignatyev/06860ec2040cb497f0f3
+
+    Changes to convert from single function to class for better state
+    management and easier update.
+    """
+
+    def __init__(self, max: int, bar_length: int = 60):
+        self.current = 0
+        self.max = max
+        self.start = time.time()
+
+        # to calc
+        self.bar_length = bar_length
+        self.update_bar_str()
+        self.remaining_h = 0
+        self.remaining_m = 0
+        self.remaining_s = 0
+        self.update_time_str()
+
+
+    def increment(self, add: int = 1):
+        self.current += add
+        self.draw()
+
+
+    def draw(self):
+        # calc bar and percent
+        self.update_bar_str()
+        # calc completion
+        self.update_time_str()
+
+        # draw
+        disp = "[{b}] {p}% {c} / {m} {t}\r".format(b=self.bar,
+                                                   p=self.percent,
+                                                   c=self.current,
+                                                   m=self.max,
+                                                   t=self.time)
+        sys.stdout.write("[{b}] {p}% {c} / {m} {t}\r")
+        sys.stdout.flush()
+
+
+    def update_bar_str(self):
+        complete = self.current / float(self.max)
+        self.percent = round(100.0 * complete, 1)
+        filled_length = int(round(self.bar_length * complete))
+
+        # bar
+        self.bar = "=" * filled_length
+        self.bar += "-" * (self.bar_length - filled_len)
+
+
+    def update_time_str(self):
+        if self.current > 0:
+            # elapsed time
+            duration = time.time() - self.start
+
+            # average time per object
+            avg_time = duration / self.current
+            avg_time = (avg_time * (self.max - self.current))
+
+            self.remaining_m, self.remaining_s = divmod(avg_time, 60)
+            self.remaining_h, self.remaining_m = divmod(m, 60)
+
+        self.time = "~ {h}:{m}:{s} remaining".format(h=self.remaining_h,
+                                                     m=self.remaining_m,
+                                                     s=self.remaining_s)
+
+
 def print_progress(count: int, start_time: float, total: int):
     """
     Print a progress bar to the console.
