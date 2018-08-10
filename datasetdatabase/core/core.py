@@ -9,9 +9,7 @@ import pickle
 import json
 
 # self
-from ..utils import format
 from ..utils import checks
-from ..utils import tools
 
 # globals
 REQUIRED_CONFIG_ITEMS = ("driver", "database")
@@ -25,6 +23,7 @@ INVALID_DS_INFO = "This set of attributes could not be found in the linked db."
 UNIX_REPLACE = {"\\": "/"}
 DATASET_EXTENSION = ".dataset"
 MISSING_INIT = "Must provide either a pandas DataFrame or a DatasetInfo object."
+EDITING_STORED_DATASET = "Datasets connected to DatasetInfo are immutable."
 
 APPROVED_EXTENSIONS = (".csv", ".tsv", ".dataset")
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
@@ -195,15 +194,15 @@ class DatasetInfo(object):
 
 class Dataset(object):
     def __init__(self,
-                 dataset: Union[str, pathlib.Path, pd.DataFrame, None] = None,
-                 ds_info: Union[DatasetInfo, None] = None,
-                 name: Union[str, None] = None,
-                 description: Union[str, None] = None,
-                 filepath_columns: Union[str, list, None] = None,
-                 type_validation_map: Union[dict, None] = None,
-                 value_validation_map: Union[dict, None] = None,
-                 import_as_type_map: bool = False,
-                 replace_paths: Union[dict, None] = None):
+            dataset: Union[str, pathlib.Path, pd.DataFrame, None] = None,
+            ds_info: Union[DatasetInfo, None] = None,
+            name: Union[str, None] = None,
+            description: Union[str, None] = None,
+            filepath_columns: Union[str, list, None] = None,
+            type_validation_map: Union[dict, None] = None,
+            value_validation_map: Union[dict, None] = None,
+            import_as_type_map: bool = False,
+            replace_paths: Union[dict, None] = None):
 
         # enforce types
         checks.check_types(dataset, [str, pathlib.Path,
@@ -254,7 +253,7 @@ class Dataset(object):
                               "files": False}
 
             # run validations
-            if type_validation_map is not None:
+            if import_as_type_map and type_validation_map is not None:
                 self.coerce_types_using_map(type_validation_map)
             if replace_paths is not None:
                 self.replace_paths_using_map(replace_paths)
@@ -315,8 +314,7 @@ class Dataset(object):
         # run casts
         if self.type_validation_map is not None:
             print("Casting values to type map...")
-            bar = tools.ProgressBar(len(self.df) * len(self.df.columns))
-            format.format_dataset(self.df, self.type_validation_map, bar)
+            checks.format_dataset(self.df, self.type_validation_map)
 
         # updated validated
         self._validated["values"] = False
@@ -336,18 +334,16 @@ class Dataset(object):
         # run replace
         if self.replace_paths is not None and self.filepath_columns is not None:
             print("Fixing filepaths using {r}...".format(r=self.replace_paths))
-            bar = tools.ProgressBar(len(self.df) * len(self.df.columns))
-            format.format_paths(self.df,
+            checks.format_paths(self.df,
                                 self.filepath_columns,
-                                self.replace_paths,
-                                bar)
+                                self.replace_paths)
 
         # update validated
         self._validated["values"] = False
 
 
     def enforce_files_exist_from_columns(self,
-        fp_cols: Union[str, list, None] = None):
+            fp_cols: Union[str, list, None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -360,10 +356,8 @@ class Dataset(object):
         # run exists
         if self.filepath_columns is not None:
             print("Checking files exist...")
-            bar = tools.ProgressBar(len(self.df) * len(self.df.columns))
             checks.validate_dataset_files(self.df,
-                                          self.filepath_columns,
-                                          bar)
+                                          self.filepath_columns)
 
         # update validated
         self._validated["files"] = True
@@ -382,10 +376,8 @@ class Dataset(object):
         # run type checks
         if self.type_validation_map is not None:
             print("Checking dataset value types...")
-            bar = tools.ProgressBar(len(self.df) * len(self.df.columns))
             checks.validate_dataset_types(self.df,
-                                          self.type_validation_map,
-                                          bar)
+                                          self.type_validation_map)
 
         # update validated
         self._validated["types"] = True
@@ -404,19 +396,17 @@ class Dataset(object):
         # run value checks
         if self.value_validation_map is not None:
             print("Checking dataset values...")
-            bar = tools.ProgressBar(len(self.df) * len(self.df.columns))
             checks.validate_dataset_values(self.df,
-                                           self.value_validation_map,
-                                           bar)
+                                           self.value_validation_map)
 
         # update validated
         self._validated["values"] = True
 
 
     def save(self,
-             path: Union[str, pathlib.Path],
-             as_type: str = DATASET_EXTENSION,
-             **kwargs) -> pathlib.Path:
+            path: Union[str, pathlib.Path],
+            as_type: str = DATASET_EXTENSION,
+            **kwargs) -> pathlib.Path:
         # enforce types
         checks.check_types(path, [str, pathlib.Path])
 

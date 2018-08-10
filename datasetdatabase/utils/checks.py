@@ -5,7 +5,9 @@ from typing import Union
 import pandas as pd
 import pathlib
 import getpass
-import types
+
+# self
+from .progressbar import ProgressBar
 
 # globals
 CHECK_TYPES_ERR = """
@@ -36,11 +38,13 @@ BLACKLISTED_USERS = ["jovyan",
                      "admin",
                      "root"]
 
+NATIVE_SUPPORT_TYPES = ["int", "float", "bool",
+                        "list", "tuple", "dict", "set"]
+
 
 def check_types(var,
-                allowed: Union[type, list, tuple],
-                err: str = CHECK_TYPES_ERR) -> \
-                Union[bool, TypeError]:
+    allowed: Union[type, list, tuple],
+    err: str = CHECK_TYPES_ERR) -> Union[bool, TypeError]:
     """
     Check the provided variable and enforce that it is one of the passed types.
 
@@ -120,8 +124,7 @@ def check_types(var,
 
 
 def check_file_exists(f: Union[str, pathlib.Path],
-                      err: str =CHECK_FILE_EXISTS_ERR) -> \
-                      Union[bool, FileNotFoundError]:
+    err: str = CHECK_FILE_EXISTS_ERR) -> Union[bool, FileNotFoundError]:
     """
     Check the provided filepath for existence.
 
@@ -188,7 +191,7 @@ def check_file_exists(f: Union[str, pathlib.Path],
 
 
 def check_user(user: Union[str, None] = None,
-               err: str = CHECK_USER_ERR) -> Union[str, ValueError]:
+    err: str = CHECK_USER_ERR) -> Union[str, ValueError]:
     """
     Check or get the username for approval.
 
@@ -259,7 +262,7 @@ def check_user(user: Union[str, None] = None,
 
 
 def check_ingest_error(e: Exception,
-                       err: str = CHECK_INGEST_ERR) -> Union[bool, TypeError]:
+    err: str = CHECK_INGEST_ERR) -> Union[bool, TypeError]:
     """
     Check the provided exception and enforce that it was an ingestion error.
 
@@ -322,34 +325,46 @@ def check_ingest_error(e: Exception,
 
 
 def validate_dataset_types(dataset: pd.DataFrame,
-                     type_map: Union[dict, None] = None,
-                     filepath_columns: Union[str, list, None] = None):
+    type_map: Union[dict, None] = None):
     # enforce types
     check_types(dataset, pd.DataFrame)
     check_types(type_map, [dict, type(None)])
+
+    err = "Dataset failed type check at:\n\tcolumn: {c}"
+
+    # enforce data types
+    if type_map is not None:
+        bar = ProgressBar(len(dataset) * len(type_map))
+        for key, ctype in type_map.items():
+            err = err.format(c=key)
+            dataset[key].apply(
+            lambda x: bar.apply_and_update(check_types,
+                                           var=x, allowed=ctype, err=err))
+
+
+def validate_dataset_files(dataset: pd.DataFrame,
+    filepath_columns: Union[str, list, None]= None):
+    # enforce types
+    check_types(dataset, pd.DataFrame)
     check_types(filepath_columns, [str, list, type(None)])
 
-    t_err = "Dataset failed type check at:\n\tcol:{c}"
-    fp_err = "Dataset file not found at:\n\tcol:{c}"
+    err = "Dataset file not found at:\n\tcolumn: {c}"
 
     # convert types
     if isinstance(filepath_columns, str):
         filepath_columns = [filepath_columns]
 
-    # enforce data types
-    if type_map is not None:
-        for key, ctype in type_map.items():
-            err = t_err.format(c=key)
-            dataset[key].apply(lambda x: check_types(x, ctype, err=err))
-
     if filepath_columns is not None:
+        bar = ProgressBar(len(dataset) * len(filepath_columns))
         for key in filepath_columns:
-            err = fp_err.format(c=key)
-            dataset[key].apply(lambda x: check_file_exists(x, err=err))
+            err = err.format(c=key)
+            dataset[key].apply(
+            lambda x: bar.apply_and_update(check_file_exists, f=x, err=err))
 
 
-def _assert_values(func, val, err):
-    assert func(val), err
+def _assert_value(f, val, err):
+    # get pass fail
+    assert f(val), err
 
 
 def validate_dataset_values(dataset: pd.DataFrame,
@@ -359,11 +374,102 @@ def validate_dataset_values(dataset: pd.DataFrame,
     check_types(validation_map, [dict, type(None)])
 
     # standard error
-    err = "Dataset failed data check at:\n\tcol:{c}"
+    err = "Dataset failed data check at:\n\tcolumn: {c}"
 
     # enforce all dataset values to meet the lambda requirements
     if validation_map is not None:
+        bar = ProgressBar(len(dataset) * len(validation_map))
         for key, func in validation_map.items():
-            dataset[key].apply(lambda x: _assert_values(func,
-                                                        x,
-                                                        err.format(c=key)))
+            dataset[key].apply(
+            lambda x: bar.apply_and_update(_assert_value,
+                                    f=func, val=x, err=err.format(c=key)))
+
+
+def cast(value: str, value_type: str, **kwargs):
+    # check types
+    check_types(value, str)
+    check_types(value_type, str)
+
+    # prep the type string
+    value_type = value_type.replace("<class '", "")[:-2]
+
+    # cast
+    if "numpy.ndarray" in value_type:
+        value = value.replace("[", "")
+        value = value.replace("]", "")
+        result = np.fromstring(value, sep=" ", **kwargs)
+    elif "str" in value_type:
+        result = eval(value_type + "('{v}')".format(v=value))
+    elif value_type in NATIVE_SUPPORT_TYPES:
+        result = eval(value_type + "({v})".format(v=value))
+    else:
+        result = value
+
+    return result
+
+
+def quick_cast(value, cast_type, info=None):
+    try:
+        if not isinstance(value, cast_type):
+            return cast_type(value)
+    except ValueError:
+        raise ValueError("Could not cast:", value,
+                         "to:", cast_type,
+                         "\ninfo:", info)
+
+    return value
+
+
+def format_dataset(dataset: pd.DataFrame,
+                   type_map: Union[dict, None] = None) -> pd.DataFrame:
+    # enforce types
+    check_types(dataset, pd.DataFrame)
+    check_types(type_map, [dict, type(None)])
+
+    # format data if type_map was passed
+    if type_map is not None:
+        bar = ProgressBar(len(dataset) * len(type_map))
+        for key, ctype in type_map.items():
+            dataset[key] = dataset[key].apply(
+                lambda v: bar.apply_and_update(quick_cast,
+                            value=v, cast_type=ctype, info="column: " + key))
+
+    return dataset
+
+
+def format_path(fp: str, replace_items: dict) -> str:
+    # enforce types
+    check_types(fp, str)
+    check_types(replace_items, dict)
+
+    # keep replacing until no changes remain
+    for cur, new in replace_items.items():
+        fp = fp.replace(cur, new)
+
+    return fp
+
+
+def format_paths(dataset: pd.DataFrame,
+                 filepath_columns: Union[str, list, None],
+                 replace_paths: Union[dict, None]) -> pd.DataFrame:
+    # enforce types
+    check_types(dataset, pd.DataFrame)
+    check_types(filepath_columns, [str, list, type(None)])
+    check_types(replace_paths, [dict, type(None)])
+
+    # early return
+    if filepath_columns is None or replace_paths is None:
+        return dataset
+
+    # convert types
+    if isinstance(filepath_columns, str):
+        filepath_columns = [filepath_columns]
+
+    bar = ProgressBar(len(self.df) * len(filepath_columns))
+
+    # apply changes
+    dataset[filepath_columns] = dataset[filepath_columns].applymap(
+        lambda fp: bar.apply_and_update(format_path,
+                                        fp=fp, replace_items=replace_paths))
+
+    return dataset
