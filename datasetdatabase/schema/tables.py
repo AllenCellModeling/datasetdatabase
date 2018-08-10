@@ -66,7 +66,7 @@ def create_FileSource(schema: orator.Schema):
     if not schema.has_table("FileSource"):
         with schema.create("FileSource") as table:
             table.increments("FileSourceId")
-            table.integer("FileId").unsigned()
+            table.string("FileId")
             table.integer("SourceId").unsigned()
             table.datetime("Created")
             table.foreign("SourceId") \

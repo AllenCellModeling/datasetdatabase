@@ -9,6 +9,9 @@ import pickle
 import json
 
 # self
+from ..schema import SchemaVersion
+from ..schema import FMSInterface
+
 from ..utils import checks
 
 # globals
@@ -31,7 +34,7 @@ UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 class DatabaseConfig(object):
     def __init__(self,
-                 config: Union[str, pathlib.Path, dict]):
+        config: Union[str, pathlib.Path, dict]):
         # enforce types
         checks.check_types(config, [str, pathlib.Path, dict])
 
@@ -73,13 +76,24 @@ class DatabaseConfig(object):
 
 class DatasetDatabase(object):
     def __init__(self,
-                 config: DatabaseConfig,
-                 build: bool = True,
-                 user: Union[str, None] = None,
-                 fms_connection_options: Union[dict, None] = None,
-                 recent_size: int = 5):
+        config: DatabaseConfig,
+        build: bool = True,
+        user: Union[str, None] = None,
+        schema_version: Union[SchemaVersion, None] = minimal,
+        fms: Union[FMSInterface, None] = None,
+        recent_size: int = 5):
 
-        self.config = config
+        # enforce types
+        checks.check_types(config, DatabaseConfig)
+        checks.check_types(build, bool)
+        checks.check_types(user, [str, type(None)])
+        checks.check_types(schema_version, [SchemaVersion, type(None)])
+        checks.check_types(fms, [FMSInterface, type(None)])
+
+        # basic items
+        self.user = checks.check_user(user)
+        self.add_user(self.user)
+        self._config = config
 
     def get_dataset(self, id=0):
         return pd.DataFrame()
@@ -90,13 +104,13 @@ class DatasetDatabase(object):
 
 class DatasetInfo(object):
     def __init__(self,
-                 DatasetId: int,
-                 Name: str,
-                 SourceId: int,
-                 Created: datetime,
-                 OriginDb: DatasetDatabase,
-                 Description: Union[str, None] = None,
-                 FilepathColumns: Union[str, None] = None):
+        DatasetId: int,
+        Name: str,
+        SourceId: int,
+        Created: datetime,
+        OriginDb: DatasetDatabase,
+        Description: Union[str, None] = None,
+        FilepathColumns: Union[str, None] = None):
 
         # enforce types
         checks.check_types(DatasetId, int)
@@ -194,15 +208,15 @@ class DatasetInfo(object):
 
 class Dataset(object):
     def __init__(self,
-            dataset: Union[str, pathlib.Path, pd.DataFrame, None] = None,
-            ds_info: Union[DatasetInfo, None] = None,
-            name: Union[str, None] = None,
-            description: Union[str, None] = None,
-            filepath_columns: Union[str, list, None] = None,
-            type_validation_map: Union[dict, None] = None,
-            value_validation_map: Union[dict, None] = None,
-            import_as_type_map: bool = False,
-            replace_paths: Union[dict, None] = None):
+        dataset: Union[str, pathlib.Path, pd.DataFrame, None] = None,
+        ds_info: Union[DatasetInfo, None] = None,
+        name: Union[str, None] = None,
+        description: Union[str, None] = None,
+        filepath_columns: Union[str, list, None] = None,
+        type_validation_map: Union[dict, None] = None,
+        value_validation_map: Union[dict, None] = None,
+        import_as_type_map: bool = False,
+        replace_paths: Union[dict, None] = None):
 
         # enforce types
         checks.check_types(dataset, [str, pathlib.Path,
@@ -417,11 +431,16 @@ class Dataset(object):
 
         # dump dataset
         if as_type == DATASET_EXTENSION:
-            path.suffix = ".dataset"
-            with open(path, "w") as write_out:
-                pickle.dump(self, write_out, **kwargs)
+            path = path.with_suffix(".dataset")
+            with open(path, "wb") as write_out:
+                to_save = Dataset(self.df,
+                                  self.info,
+                                  self.name,
+                                  self.description,
+                                  self.filepath_columns)
+                pickle.dump(to_save, write_out, **kwargs)
         else:
-            path.suffix = as_type
+            path = path.with_suffix(as_type)
             self.dataframe.to_csv(path, **kwargs)
 
         return path
@@ -455,15 +474,15 @@ def read_dataset(path: Union[str, pathlib.Path]):
     # read csv
     if path.suffix == ".csv":
         dataset = pd.read_csv(path)
-        path.suffix = ""
+        path = path.with_suffix("")
         return Dataset(dataset=dataset, name=path.name)
 
     # read tsv
     if path.suffix == ".tsv":
         dataset = pd.read_csv(path, sep="\t")
-        path.suffix = ""
+        path = path.with_suffix("")
         return Dataset(dataset=dataset, name=path.name)
 
     # read packaged dataset
-    with open("path", "r") as read_in:
+    with open(path, "rb") as read_in:
         return pickle.load(read_in)
