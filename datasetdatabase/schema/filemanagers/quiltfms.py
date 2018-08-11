@@ -21,10 +21,9 @@ STORAGE_USER = "dsdb_storage"
 CONNECTION_OPTIONS = {"user": STORAGE_USER, "storage_location": None}
 
 
-class FMS(object):
+class QuiltFMS(object):
 
     def __init__(self,
-                 dsdb,
                  connection_options: Union[dict, None] = None,
                  build: bool = True):
 

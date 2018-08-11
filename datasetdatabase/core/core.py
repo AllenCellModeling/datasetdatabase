@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 
 # installed
+from typing import Union, Dict, List
 from datetime import datetime
-from typing import Union
 import pandas as pd
 import pathlib
+import orator
 import pickle
 import json
+import abc
 
 # self
-from ..schema import SchemaVersion
 from ..schema import FMSInterface
-
 from ..utils import checks
 
 # globals
@@ -33,8 +33,7 @@ UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 
 class DatabaseConfig(object):
-    def __init__(self,
-        config: Union[str, pathlib.Path, dict]):
+    def __init__(self, config: Union[str, pathlib.Path, Dict[str, str]]):
         # enforce types
         checks.check_types(config, [str, pathlib.Path, dict])
 
@@ -45,42 +44,129 @@ class DatabaseConfig(object):
             with open(config, "r") as read_in:
                 config = json.load(read_in)
 
-        # assert only single name and link given
-        assert len(config) == 1, TOO_MANY_CONFIGS
+        # enforce config minimum attributes
+        valid_config = all(k in REQUIRED_CONFIG_ITEMS for k in config)
+        assert valid_config, MISSING_REQUIRED_ITEMS
 
-        # enforce minimum
-        for db_name, cfg in config.items():
-            valid_config = all(k in REQUIRED_CONFIG_ITEMS for k in cfg)
-            assert valid_config, MISSING_REQUIRED_ITEMS
+        self._config = config
 
-            # import config
-            self.name = db_name
-            for key, item in cfg.items():
-                self.__setattr__(key, item)
 
-            # convert database link and enforce exists
-            if self.driver == "sqlite":
-                self.database = pathlib.Path(self.database)
-                assert self.database.suffix == ".db", MALFORMED_LOCAL_LINK
-                if not self.database.exists():
-                    self.database.parent.mkdir(parents=True, exist_ok=True)
+    @property
+    def config(self):
+        return self._config
 
 
     def __str__(self):
-        return str(self.__dict__)
+        return str(self.config)
 
 
     def __repr__(self):
         return str(self)
 
 
+class DatabaseConstructor(object):
+    def __init__(self,
+        config: DatabaseConfig,
+        version: Union[SchemaVersion, None] = None,
+        fms: Union[FMSInterface, None] = None):
+
+        # enforce types
+        checks.check_types(config, DatabaseConfig)
+        checks.check_types(version, [SchemaVersion, type(None)])
+        checks.check_types(fms, [FMSInterface, type(None)])
+
+        # store attributes
+        self._config = config
+        self._version = version
+        self._fms = fms
+
+
+    @property
+    def config(self):
+        return self._config
+
+
+    @property
+    def version(self):
+        # None passed, load default
+        if self._version is None:
+            from ..schema.minimal import MINIMAL
+            self._version = MINIMAL
+
+        return self._version
+
+
+    @property
+    def fms(self):
+        # None passed, load default
+        if self._fms is None:
+            from ..schema.filemanagers.quiltfms import QuiltFMS
+            self._fms = QuiltFMS()
+
+        return self._fms
+
+
+    @property
+    def db(self):
+        return self._db
+
+
+    @property
+    def schema(self):
+        return self._schema
+
+
+    def prepare_connection(self):
+        # convert database link and enforce exists
+        if self.config.config["driver"] == "sqlite":
+            link = self.config.config["database"]
+            link = pathlib.Path(self.database)
+            assert link.suffix == ".db", MALFORMED_LOCAL_LINK
+            if not link.exists():
+                link.parent.mkdir(parents=True, exist_ok=True)
+
+
+    def create_schema(self):
+        # create all tables in version
+        for tbl, func in self.version.tables.items():
+            func(self.schema)
+
+
+    def build(self):
+        # run preparation steps
+        self.prepare_connection()
+
+        # connect
+        self._db = orator.DatabaseManager(self.config.config)
+        self._schema = orator.Schema(self.db)
+
+        # create schema
+        self.create_schema()
+
+        # TODO:
+        # create file table from FMS module
+
+        return self.db
+
+
+    def drop_schema(self):
+        # get drop order
+        drop_order = list(self.version.tables)
+        drop_order.reverse()
+
+        # drop
+        for tbl in drop_order:
+            self.schema.drop_if_exists()
+
+        # TODO:
+        # drop file table from FMS module
+
+
 class DatasetDatabase(object):
     def __init__(self,
         config: DatabaseConfig,
-        build: bool = True,
         user: Union[str, None] = None,
-        schema_version: Union[SchemaVersion, None] = minimal,
-        fms: Union[FMSInterface, None] = None,
+        constructor: Union[DatabaseConstructor, None] = None
         recent_size: int = 5):
 
         # enforce types
@@ -90,13 +176,30 @@ class DatasetDatabase(object):
         checks.check_types(schema_version, [SchemaVersion, type(None)])
         checks.check_types(fms, [FMSInterface, type(None)])
 
-        # basic items
-        self.user = checks.check_user(user)
-        self.add_user(self.user)
+        # state basic items
         self._config = config
+        self._user = checks.check_user(user)
+
+        if constructor
+
+        # upload basic items
+        # self.add_user(self.user)
+
+
+
+    @property
+    def config(self):
+        return self._config
+
+
+    @property
+    def user(self):
+        return self._user
+
 
     def get_dataset(self, id=0):
         return pd.DataFrame()
+
 
     def get_items_from_table(self, table, conditions):
         return []
@@ -212,11 +315,11 @@ class Dataset(object):
         ds_info: Union[DatasetInfo, None] = None,
         name: Union[str, None] = None,
         description: Union[str, None] = None,
-        filepath_columns: Union[str, list, None] = None,
-        type_validation_map: Union[dict, None] = None,
-        value_validation_map: Union[dict, None] = None,
+        filepath_columns: Union[str, List[str], None] = None,
+        type_validation_map: Union[Dict[str, types.TypeType], None] = None,
+        value_validation_map: Union[Dict[str, types.FunctionType], None] = None,
         import_as_type_map: bool = False,
-        replace_paths: Union[dict, None] = None):
+        replace_paths: Union[Dict[str, str], None] = None):
 
         # enforce types
         checks.check_types(dataset, [str, pathlib.Path,
@@ -315,7 +418,8 @@ class Dataset(object):
         return state
 
 
-    def coerce_types_using_map(self, type_map: Union[dict, None] = None):
+    def coerce_types_using_map(self,
+        type_map: Union[Dict[str, types.TypeType], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -335,7 +439,8 @@ class Dataset(object):
         self._validated["types"] = False
 
 
-    def replace_paths_using_map(self, path_replace: Union[dict, None] = None):
+    def replace_paths_using_map(self,
+        path_replace: Union[Dict[str, str], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -357,7 +462,7 @@ class Dataset(object):
 
 
     def enforce_files_exist_from_columns(self,
-            fp_cols: Union[str, list, None] = None):
+        fp_cols: Union[str, List[str], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -377,7 +482,8 @@ class Dataset(object):
         self._validated["files"] = True
 
 
-    def enforce_types_using_map(self, type_map: Union[dict, None] = None):
+    def enforce_types_using_map(self,
+        type_map: Union[Dict[str, types.TypeType], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -397,7 +503,8 @@ class Dataset(object):
         self._validated["types"] = True
 
 
-    def enforce_values_using_map(self, value_map: Union[dict, None] = None):
+    def enforce_values_using_map(self,
+        value_map: Union[Dict[str, types.FunctionType], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -418,9 +525,9 @@ class Dataset(object):
 
 
     def save(self,
-            path: Union[str, pathlib.Path],
-            as_type: str = DATASET_EXTENSION,
-            **kwargs) -> pathlib.Path:
+        path: Union[str, pathlib.Path],
+        as_type: str = DATASET_EXTENSION,
+        **kwargs) -> pathlib.Path:
         # enforce types
         checks.check_types(path, [str, pathlib.Path])
 
