@@ -13,6 +13,7 @@ import json
 import os
 
 # self
+from .fmsinterface import FMSInterface
 from ...utils import checks
 from ...utils import tools
 
@@ -21,47 +22,29 @@ STORAGE_USER = "dsdb_storage"
 CONNECTION_OPTIONS = {"user": STORAGE_USER, "storage_location": None}
 
 
-class QuiltFMS(object):
+class QuiltFMS(FMSInterface):
 
     def __init__(self,
-                 connection_options: Union[dict, None] = None,
-                 build: bool = True):
+                 connection_options: Union[dict, None] = None):
 
         # enforce types
         checks.check_types(connection_options, [dict, type(None)])
-        checks.check_types(build, bool)
-
-        # set object attributes
-        self.dsdb = dsdb
 
         # set or merge defaults with provided
-        if connection_options is None:
-            self.connection_options = CONNECTION_OPTIONS
-        else:
-            self.connection_options = {**CONNECTION_OPTIONS,
-                                       **connection_options}
+        # if connection_options is None:
+        #     self._connection_options = CONNECTION_OPTIONS
+        # else:
+        #     self._connection_options = {**CONNECTION_OPTIONS,
+        #                                **connection_options}
+        #
+        # # update storage user
+        # self.storage_user = self.connection_options["user"]
+        # self.set_storage_location(self.connection_options["storage_location"])
 
-        # update storage user
-        self.storage_user = self.connection_options["user"]
-        self.set_storage_location(self.connection_options["storage_location"])
 
-        # create tables and connections
-        if build:
-            # create table
-            self.create_File(self.dsdb.schema)
-
-            # update FileSource relationship
-            try:
-                with self.dsdb.schema.table("FileSource") as table:
-                    table.foreign("FileId") \
-                         .references("FileId") \
-                         .on("File")
-            except orator.exceptions.query.QueryException:
-                pass
-
-        # update table map
-        if "File" not in self.dsdb.tables:
-            self.dsdb.tables["File"] = self.dsdb.database.table("File")
+    @property
+    def table_name(self):
+        return "File"
 
 
     def create_File(self, schema: orator.Schema):
@@ -71,22 +54,24 @@ class QuiltFMS(object):
         # create table
         if not schema.has_table("File"):
             with schema.create("File") as table:
-                table.increments("FileId")
+                table.string("FileId")
+                table.string("Filename")
                 table.string("OriginalFilepath")
-                table.string("Filetype").nullable()
-                table.string("ReadPath").unique()
+                table.string("FileType").nullable()
+                table.string("ReadPath")
                 table.string("MD5").unique()
+                table.string("SHA256").unique()
                 table.string("QuiltPackage").unique()
                 table.string("Metadata").nullable()
                 table.datetime("Created")
 
-
-    def handle_drop_schema(self):
-        # drop the file table
-        self.dsdb.schema.drop_if_exists("File")
+        # update FileSource relationship
         try:
-            self.dsdb.tables.pop("File")
-        except KeyError:
+            with schema.table("FileSource") as table:
+                table.foreign("FileId") \
+                     .references("FileId") \
+                     .on("File")
+        except orator.exceptions.query.QueryException:
             pass
 
 
@@ -228,21 +213,3 @@ class QuiltFMS(object):
         os.remove(temp_write_loc)
 
         return full_package_name
-
-
-# this hashing function is pulled from:
-# https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file#answer-3431835
-# addressing concerns:
-# these hexdigests will only be used as unique file ids to detect if a file is
-# new or not, no security issues
-def _hash_bytestr_iter(bytesiter, hasher, ashexstr=False):
-    for block in bytesiter:
-        hasher.update(block)
-    return (hasher.hexdigest() if ashexstr else hasher.digest())
-
-def _file_as_blockiter(afile, blocksize=65536):
-    with afile:
-        block = afile.read(blocksize)
-        while len(block) > 0:
-            yield block
-            block = afile.read(blocksize)

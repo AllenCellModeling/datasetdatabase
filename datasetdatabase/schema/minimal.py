@@ -4,6 +4,8 @@
 from .schemaversion import SchemaVersion
 from ..schema import tables
 
+from ..version import VERSION
+
 # globals
 # CREATION ORDER OF TABLES MATTERS
 TABLES = {"User": tables.create_User,
@@ -21,4 +23,4 @@ TABLES = {"User": tables.create_User,
           "RunOutput": tables.create_RunOutput,
           "RunSource": tables.create_RunSource}
 
-MINIMAL = SchemaVersion("MINIMAL", TABLES)
+MINIMAL = SchemaVersion("MINIMAL", TABLES, VERSION)

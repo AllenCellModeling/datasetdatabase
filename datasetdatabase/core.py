@@ -7,16 +7,20 @@ import pandas as pd
 import pathlib
 import orator
 import pickle
+import types
 import json
 import abc
 
 # self
-from ..schema import FMSInterface
-from ..utils import checks
+from .schema import FMSInterface
+from .schema import SchemaVersion
+from .utils import checks
+
+from .version import VERSION
 
 # globals
 REQUIRED_CONFIG_ITEMS = ("driver", "database")
-MISSING_REQUIRED_ITEMS = "Config must have {i}".format(i=REQUIRED_CONFIG_ITEMS)
+MISSING_REQUIRED_ITEMS = "Config must have {i}.".format(i=REQUIRED_CONFIG_ITEMS)
 MALFORMED_LOCAL_LINK = "Local databases must have suffix '.db'"
 TOO_MANY_CONFIGS = "Config must be only for a single database link."
 
@@ -33,8 +37,11 @@ UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 
 class DatabaseConfig(object):
-    def __init__(self, config: Union[str, pathlib.Path, Dict[str, str]]):
+    def __init__(self,
+        config: Union[str, pathlib.Path, Dict[str, str]],
+        name: Union[str, None] = None):
         # enforce types
+        checks.check_types(name, [str, type(None)])
         checks.check_types(config, [str, pathlib.Path, dict])
 
         # convert types
@@ -45,10 +52,21 @@ class DatabaseConfig(object):
                 config = json.load(read_in)
 
         # enforce config minimum attributes
-        valid_config = all(k in REQUIRED_CONFIG_ITEMS for k in config)
+        valid_config = all(k in config for k in REQUIRED_CONFIG_ITEMS)
         assert valid_config, MISSING_REQUIRED_ITEMS
 
+        # passed enforcement
         self._config = config
+
+        # assign name
+        if name is None:
+                self.name = pathlib.Path(self.config["database"])\
+                            .with_suffix("")\
+                            .name
+
+
+    def __iter__(self):
+        yield self.name, self.config
 
 
     @property
@@ -57,7 +75,7 @@ class DatabaseConfig(object):
 
 
     def __str__(self):
-        return str(self.config)
+        return str(dict(self))
 
 
     def __repr__(self):
@@ -66,19 +84,24 @@ class DatabaseConfig(object):
 
 class DatabaseConstructor(object):
     def __init__(self,
-        config: DatabaseConfig,
-        version: Union[SchemaVersion, None] = None,
+        config: Union[DatabaseConfig, None],
+        schema: Union[SchemaVersion, None] = None,
         fms: Union[FMSInterface, None] = None):
 
         # enforce types
-        checks.check_types(config, DatabaseConfig)
-        checks.check_types(version, [SchemaVersion, type(None)])
+        checks.check_types(config, [DatabaseConfig, type(None)])
+        checks.check_types(schema, [SchemaVersion, type(None)])
         checks.check_types(fms, [FMSInterface, type(None)])
+
+        if config is None:
+            config = LOCAL
 
         # store attributes
         self._config = config
-        self._version = version
+        self._schema = schema
         self._fms = fms
+        self._tables = []
+        self._db = orator.DatabaseManager(dict(self.config))
 
 
     @property
@@ -87,23 +110,28 @@ class DatabaseConstructor(object):
 
 
     @property
-    def version(self):
+    def schema(self):
         # None passed, load default
-        if self._version is None:
-            from ..schema.minimal import MINIMAL
-            self._version = MINIMAL
+        if self._schema is None:
+            from .schema.minimal import MINIMAL
+            self._schema = MINIMAL
 
-        return self._version
+        return self._schema
 
 
     @property
     def fms(self):
         # None passed, load default
         if self._fms is None:
-            from ..schema.filemanagers.quiltfms import QuiltFMS
+            from .schema.filemanagers.quiltfms import QuiltFMS
             self._fms = QuiltFMS()
 
         return self._fms
+
+
+    @property
+    def tables(self):
+        return self._tables
 
 
     @property
@@ -111,16 +139,11 @@ class DatabaseConstructor(object):
         return self._db
 
 
-    @property
-    def schema(self):
-        return self._schema
-
-
     def prepare_connection(self):
         # convert database link and enforce exists
         if self.config.config["driver"] == "sqlite":
             link = self.config.config["database"]
-            link = pathlib.Path(self.database)
+            link = pathlib.Path(link)
             assert link.suffix == ".db", MALFORMED_LOCAL_LINK
             if not link.exists():
                 link.parent.mkdir(parents=True, exist_ok=True)
@@ -130,6 +153,13 @@ class DatabaseConstructor(object):
         # create all tables in version
         for tbl, func in self.version.tables.items():
             func(self.schema)
+            if tbl not in self.tables:
+                self._tables.append(tbl)
+
+        # create file table from fms module
+        if self.fms.table_name not in self.tables:
+            self.fms.create_File(self.schema)
+            self._tables.append(self.fms.table_name)
 
 
     def build(self):
@@ -137,14 +167,10 @@ class DatabaseConstructor(object):
         self.prepare_connection()
 
         # connect
-        self._db = orator.DatabaseManager(self.config.config)
         self._schema = orator.Schema(self.db)
 
         # create schema
         self.create_schema()
-
-        # TODO:
-        # create file table from FMS module
 
         return self.db
 
@@ -158,33 +184,71 @@ class DatabaseConstructor(object):
         for tbl in drop_order:
             self.schema.drop_if_exists()
 
-        # TODO:
-        # drop file table from FMS module
+
+    def get_tables(self):
+        # run preparation steps
+        self.prepare_connection()
+
+        if self.config.config["driver"] == "sqlite":
+            names = self.db.table("sqlite_master") \
+                           .select("name") \
+                           .where("type", "=", "table").get()
+            names = [t["name"] for t in names if t["name"] != "sqlite_sequence"]
+        else:
+            names = self.db.table("pg_catalog.pg_tables") \
+                           .select("tablename") \
+                           .where("schemaname", "=", "public").get()
+
+            names = [t.tablename for t in names]
+
+        if "migrations" in names:
+            names.remove("migrations")
+
+        self._tables = names
+        return self.db
+
 
 
 class DatasetDatabase(object):
     def __init__(self,
-        config: DatabaseConfig,
+        config: Union[DatabaseConfig, str, pathlib.Path, None] = None,
         user: Union[str, None] = None,
-        constructor: Union[DatabaseConstructor, None] = None
+        constructor: Union[DatabaseConstructor, None] = None,
+        build: bool = False,
         recent_size: int = 5):
 
         # enforce types
-        checks.check_types(config, DatabaseConfig)
-        checks.check_types(build, bool)
+        checks.check_types(config,
+                           [DatabaseConfig, str, pathlib.Path, type(None)])
         checks.check_types(user, [str, type(None)])
-        checks.check_types(schema_version, [SchemaVersion, type(None)])
-        checks.check_types(fms, [FMSInterface, type(None)])
+        checks.check_types(constructor, [DatabaseConstructor, type(None)])
+        checks.check_types(recent_size, int)
+
+        # assume local
+        if config is None:
+            config = LOCAL
+
+        # read config
+        if isinstance(config, (str, pathlib.Path)):
+            config = DatabaseConfig(config)
 
         # state basic items
         self._config = config
         self._user = checks.check_user(user)
+        self.recent_size = recent_size
 
-        if constructor
+        # create constructor
+        if constructor is None:
+            self._constructor = DatabaseConstructor(self.config)
+
+        # connect
+        if build:
+            self._db = self.constructor.build()
+        else:
+            self._db = self.constructor.get_tables()
 
         # upload basic items
         # self.add_user(self.user)
-
 
 
     @property
@@ -197,12 +261,83 @@ class DatasetDatabase(object):
         return self._user
 
 
+    @property
+    def constructor(self):
+        return self._constructor
+
+
+    @property
+    def db(self):
+        return self._db
+
+
+    def upload_dataset(self,
+        dataset: Union[Dataset, str, pathlib.Path, pd.DataFrame],
+        **kwargs) -> DatasetInfo:
+
+        # enforce types
+        checks.check_types(dataset, [Dataset, str, pathlib.Path, pd.DataFrame])
+
+        # convert dataset
+        if not isinstance(dataset, Dataset):
+            dataset = Dataset(dataset, **kwargs)
+
+        return
+
+
     def get_dataset(self, id=0):
         return pd.DataFrame()
 
 
     def get_items_from_table(self, table, conditions):
         return []
+
+
+    @property
+    def recent(self):
+        print(("-" * 31) + " DATASET DATABASE " + ("-" * 31))
+
+        for name in self.constructor.tables:
+            print("-" * 80)
+            print("Recent " + name + ":")
+            try:
+                table = self.db.table(name)
+                if name == "Run":
+                    recent = table.order_by("End", "desc")\
+                                  .limit(self.recent_size)\
+                                  .get()
+                else:
+                    recent = table.order_by("Created", "desc")\
+                                  .limit(self.recent_size)\
+                                  .get()
+
+                for item in recent:
+                    print(dict(item))
+
+            except (orator.exceptions.query.QueryException, KeyError) as e:
+                print("!package or schema not up to date!")
+
+
+    def __str__(self):
+        # basic print
+        disp = "Recent Datasets:"
+        disp += ("\n" + ("-" * 80))
+
+        # collect datasets
+        recent = self.db.table("Dataset")\
+                     .order_by("Created", "desc")\
+                     .limit(self.recent_size)\
+                     .get()
+
+        # format print
+        for item in recent:
+            disp += ("\n" + str(dict(item)))
+
+        return disp
+
+
+    def __repr__(self):
+        return str(self)
 
 
 class DatasetInfo(object):
@@ -316,7 +451,7 @@ class Dataset(object):
         name: Union[str, None] = None,
         description: Union[str, None] = None,
         filepath_columns: Union[str, List[str], None] = None,
-        type_validation_map: Union[Dict[str, types.TypeType], None] = None,
+        type_validation_map: Union[Dict[str, type], None] = None,
         value_validation_map: Union[Dict[str, types.FunctionType], None] = None,
         import_as_type_map: bool = False,
         replace_paths: Union[Dict[str, str], None] = None):
@@ -419,7 +554,7 @@ class Dataset(object):
 
 
     def coerce_types_using_map(self,
-        type_map: Union[Dict[str, types.TypeType], None] = None):
+        type_map: Union[Dict[str, type], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -483,7 +618,7 @@ class Dataset(object):
 
 
     def enforce_types_using_map(self,
-        type_map: Union[Dict[str, types.TypeType], None] = None):
+        type_map: Union[Dict[str, type], None] = None):
         # assert new dataset
         assert self.info is None, EDITING_STORED_DATASET
 
@@ -522,6 +657,18 @@ class Dataset(object):
 
         # update validated
         self._validated["values"] = True
+
+
+    def upload_to(self, database: DatasetDatabase) -> DatasetInfo:
+        # enforce types
+        checks.check_types(database, DatasetDatabase)
+
+        database.run()
+
+
+    def apply(self,
+        function: Union[types.ModuleType, types.FunctionType]):
+        return
 
 
     def save(self,
@@ -593,3 +740,9 @@ def read_dataset(path: Union[str, pathlib.Path]):
     # read packaged dataset
     with open(path, "rb") as read_in:
         return pickle.load(read_in)
+
+
+# delayed globals
+LOCAL = {"driver": "sqlite",
+         "database": str(pathlib.Path("./local.db").resolve())}
+LOCAL = DatabaseConfig(LOCAL)

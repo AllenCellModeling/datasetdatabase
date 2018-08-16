@@ -33,50 +33,6 @@ def suppress_prints():
         finally:
             sys.stdout = old_stdout
 
-def create_pickle_file(table: pd.DataFrame,
-                       path: Union[str, pathlib.Path, None] = None) \
-                       -> pathlib.Path:
-    # enforce types
-    checks.check_types(table, pd.DataFrame)
-    checks.check_types(path, [str, pathlib.Path, type(None)])
-
-    # convert path
-    if isinstance(path, type(None)):
-        path = os.getcwd()
-    if isinstance(path, str):
-        path = pathlib.Path(path)
-
-    # custom file
-    if path.is_dir():
-        path /= "custom_dataframe.pkl"
-
-    # dump object
-    table.to_pickle(path)
-
-    return path
-
-def create_npy_file(arr: np.ndarray,
-                    path: Union[str, pathlib.Path, None] = None) \
-                    -> pathlib.Path:
-    # enforce types
-    checks.check_types(arr, np.ndarray)
-    checks.check_types(path, [str, pathlib.Path, type(None)])
-
-    # convert path
-    if isinstance(path, type(None)):
-        path = os.getcwd()
-    if isinstance(path, str):
-        path = pathlib.Path(path)
-
-    # custom file
-    if path.is_dir():
-        path /= "custom_arr.npy"
-
-    # dump object
-    np.save(path, arr)
-
-    return path
-
 
 def convert_size(size_bytes):
     """
