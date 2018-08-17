@@ -28,9 +28,11 @@ FILEPATH_COL_SEP = ","
 INVALID_DS_INFO = "This set of attributes could not be found in the linked db."
 
 UNIX_REPLACE = {"\\": "/"}
+GENERIC_TYPES = Union[bytes, str, int, float, None, datetime]
 DATASET_EXTENSION = ".dataset"
 MISSING_INIT = "Must provide either a pandas DataFrame or a DatasetInfo object."
 EDITING_STORED_DATASET = "Datasets connected to DatasetInfo are immutable."
+TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
 
 APPROVED_EXTENSIONS = (".csv", ".tsv", ".dataset")
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
@@ -248,7 +250,7 @@ class DatasetDatabase(object):
             self._db = self.constructor.get_tables()
 
         # upload basic items
-        # self.add_user(self.user)
+        self._user_info = self._get_or_insert_user(self.user)
 
 
     @property
@@ -271,6 +273,39 @@ class DatasetDatabase(object):
         return self._db
 
 
+    def _get_or_insert_user(self,
+        user: Union[str, None] = None,
+        description: Union[str, None] = None) -> Dict[str, GENERIC_TYPES]:
+
+        # enforce types
+        checks.check_types(user, [str, type(None)])
+        checks.check_types(description, [str, type(None)])
+
+        # get default
+        if name is None:
+            name = self._user
+
+        # check the os user name
+        name = checks.check_user(name)
+        # if valid set user
+        self._user = name
+
+        # attempt get
+        user_info = self.get_items_from_table("User", ["Name", "=", name])
+
+        # not found
+        if len(user_info) == 0:
+            return self._insert_to_table("User",
+                {"Name": name,
+                 "Description": description,
+                 "Created": datetime.now()})
+        # found
+        if len(user_info) == 1:
+            return user_info[0]
+        # database structure error
+        raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+
+
     def upload_dataset(self,
         dataset: Union[Dataset, str, pathlib.Path, pd.DataFrame],
         **kwargs) -> DatasetInfo:
@@ -289,8 +324,60 @@ class DatasetDatabase(object):
         return pd.DataFrame()
 
 
-    def get_items_from_table(self, table, conditions):
-        return []
+    def get_items_from_table(self,
+        table: str,
+        conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]] = []) \
+        -> List[Dict[str, GENERIC_TYPES]]:
+
+        # enforce types
+        checks.check_types(table, str)
+        checks.check_types(conditions, list)
+
+        # construct orator table
+        table = self.db.table(table)
+
+        # expand multiple conditions
+        if all(isinstance(cond, list) for cond in conditions):
+            for cond in conditions:
+                table = table.where(*cond)
+        # expand single condition
+        else:
+            table = table.where(*conditions)
+
+        # get table
+        table = table.get()
+
+        # format
+        return [dict(item) for item in table]
+
+
+    def _insert_to_table(self,
+        table: str,
+        items: Dict[str, GENERIC_TYPES]) -> Dict[str, GENERIC_TYPES]:
+
+        # enforce types
+        checks.check_types(table, str)
+        checks.check_types(items, dict)
+
+        # create conditions
+        conditions = [[k, "=", v] for k, v in items.items()]
+
+        # check exists
+        found_items = self.get_items_from_table(table, conditions)
+
+        # not found
+        if len(found_items) == 0:
+            id = self.db.table(table)\
+                .insert_get_id(items, sequence=(table + "Id"))
+            id_condition = [table + "Id", "=", id]
+            return self.get_items_from_table(table, id_condition)[0]
+
+        # found
+        if len(found_items) == 1:
+            return found_items[0]
+
+        # database structure error
+        raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
 
     @property
@@ -663,11 +750,18 @@ class Dataset(object):
         # enforce types
         checks.check_types(database, DatasetDatabase)
 
-        database.run()
+        # run upload
+        return database.upload_dataset(self)
 
 
     def apply(self,
         function: Union[types.ModuleType, types.FunctionType]):
+
+        # TODO:
+        # roundtrip if no ds info attached
+        # process
+        # new dataset
+
         return
 
 
