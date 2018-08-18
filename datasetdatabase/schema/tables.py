@@ -31,9 +31,8 @@ def create_Iota(schema: orator.Schema):
             table.big_increments("IotaId")
             table.string("Key", 50)
             table.binary("Value")
-            table.string("ValueType")
             table.datetime("Created")
-            table.unique(["GroupId", "Key", "Value", "ValueType"])
+            table.unique(["Key", "Value"])
 
 
 def create_Group(schema: orator.Schema):
