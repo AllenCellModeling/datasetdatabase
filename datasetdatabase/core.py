@@ -140,6 +140,10 @@ class DatabaseConstructor(object):
     def db(self):
         return self._db
 
+    @property
+    def orator_schema(self):
+        return self._orator_schema
+
 
     def prepare_connection(self):
         # convert database link and enforce exists
@@ -153,14 +157,14 @@ class DatabaseConstructor(object):
 
     def create_schema(self):
         # create all tables in version
-        for tbl, func in self.version.tables.items():
-            func(self.schema)
+        for tbl, func in self.schema.tables.items():
+            func(self.orator_schema)
             if tbl not in self.tables:
                 self._tables.append(tbl)
 
         # create file table from fms module
         if self.fms.table_name not in self.tables:
-            self.fms.create_File(self.schema)
+            self.fms.create_File(self.orator_schema)
             self._tables.append(self.fms.table_name)
 
 
@@ -169,7 +173,7 @@ class DatabaseConstructor(object):
         self.prepare_connection()
 
         # connect
-        self._schema = orator.Schema(self.db)
+        self._orator_schema = orator.Schema(self.db)
 
         # create schema
         self.create_schema()
@@ -179,7 +183,7 @@ class DatabaseConstructor(object):
 
     def drop_schema(self):
         # get drop order
-        drop_order = list(self.version.tables)
+        drop_order = list(self.schema.tables)
         drop_order.reverse()
 
         # drop
@@ -208,7 +212,6 @@ class DatabaseConstructor(object):
 
         self._tables = names
         return self.db
-
 
 
 class DatasetDatabase(object):
@@ -282,21 +285,21 @@ class DatasetDatabase(object):
         checks.check_types(description, [str, type(None)])
 
         # get default
-        if name is None:
-            name = self._user
+        if user is None:
+            user = self._user
 
-        # check the os user name
-        name = checks.check_user(name)
+        # check the os user
+        user = checks.check_user(user)
         # if valid set user
-        self._user = name
+        self._user = user
 
         # attempt get
-        user_info = self.get_items_from_table("User", ["Name", "=", name])
+        user_info = self.get_items_from_table("User", ["Name", "=", user])
 
         # not found
         if len(user_info) == 0:
             return self._insert_to_table("User",
-                {"Name": name,
+                {"Name": user,
                  "Description": description,
                  "Created": datetime.now()})
         # found
@@ -307,8 +310,8 @@ class DatasetDatabase(object):
 
 
     def upload_dataset(self,
-        dataset: Union[Dataset, str, pathlib.Path, pd.DataFrame],
-        **kwargs) -> DatasetInfo:
+        dataset: Union["Dataset", str, pathlib.Path, pd.DataFrame],
+        **kwargs) -> "DatasetInfo":
 
         # enforce types
         checks.check_types(dataset, [Dataset, str, pathlib.Path, pd.DataFrame])

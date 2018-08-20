@@ -1,11 +1,5 @@
 FROM jupyter/minimal-notebook
 
-# update python
-RUN conda install -c anaconda python=3.7
-
-# update conda
-RUN conda update --all
-
 # upgrade pip
 RUN pip install --upgrade pip
 
