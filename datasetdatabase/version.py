@@ -67,6 +67,8 @@ REQUIRES = ["numpy",
             "pandas",
             "orator",
             "pathlib",
+            "networkx",
+            "matplotlib",
             "sqlalchemy",
             "psycopg2_binary",
             "python_Levenshtein"]
