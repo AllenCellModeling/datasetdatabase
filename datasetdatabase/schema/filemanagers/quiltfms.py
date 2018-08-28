@@ -65,12 +65,18 @@ class QuiltFMS(FMSInterface):
                 table.string("Metadata").nullable()
                 table.datetime("Created")
 
-        # update FileSource relationship
+        # update FileSource and Algorithm relationships
         try:
             with schema.table("FileSource") as table:
                 table.foreign("FileId") \
                      .references("FileId") \
                      .on("File")
+
+            with schema.table("Algorithm") as table:
+                table.foreign("FileId") \
+                     .references("FileId") \
+                     .on("File")
+            
         except orator.exceptions.query.QueryException:
             pass
 

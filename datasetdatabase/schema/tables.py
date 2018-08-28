@@ -153,6 +153,7 @@ def create_Algorithm(schema: orator.Schema):
     if not schema.has_table("Algorithm"):
         with schema.create("Algorithm") as table:
             table.increments("AlgorithmId")
+            table.string("FileId")
             table.string("Name")
             table.string("Description").nullable()
             table.string("Version")

@@ -7,10 +7,16 @@ import abc
 class Introspector(abc.ABC):
     def __init__(self, obj: object):
         self._obj = obj
+        self._validated = False
 
     @property
     def obj(self):
         return self._obj
+
+    @property
+    @abc.abstractmethod
+    def validated(self):
+        return self._validated
 
     @abc.abstractmethod
     def parse(self) -> Dict[str, List[int]]:

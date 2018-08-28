@@ -22,9 +22,9 @@ There are three core functions for using a dataset database:
 
 For a more detailed understanding of the package here is a full list of major topics that you can view for more detailed information.
 
-* [Schema](./schema.md)
-* [File Management Systems](./fms.md)
+* [Database Schemas](./schema.md)
 * [Database Constructor](./constructor.md)
+* [File Management Systems](./fms.md)
 * [Processing and Algorithm Handling](./run.md)
 
 This is a completely open source project created at the Allen Institute for Cell Science and contributions are welcome. Please refer to the [AllenCellModeling GitHub](https://github.com/allencellmodeling) for contributing, bug reports, and feature requests.
