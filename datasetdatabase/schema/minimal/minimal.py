@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 # self
-from .schemaversion import SchemaVersion
-from ..schema import tables
+from ..schemaversion import SchemaVersion
+from ...schema import tables
 
-from ..version import VERSION
+from ...version import VERSION
 
 # globals
 # CREATION ORDER OF TABLES MATTERS
