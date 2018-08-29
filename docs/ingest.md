@@ -40,7 +40,6 @@ ds
     obj: True,
     name: "test_dataset",
     description: None,
-    filepath_columns: None,
     validated: {
         types: False,
         values: False,
@@ -50,12 +49,12 @@ ds
 ```python
 ds.obj
 ```
-||foo|bar|
-|--|--|--|
-|1|"hello"|True|
-|2|"world"|False|
+|  | foo | bar |
+|:--:|:--|:--|
+| 1 | "hello" | True |
+| 2 | "world" | False |
 
-As you can see from the above representation (`repr`) of the Dataset, in the case of a dataframe like object, a Dataset will be created and the minimum validation fields are created but not validated yet. The minimum validation requirements for dataframe like objects are filepath_columns, and validated types, values, and files. There is additionally an "info" attribute, this is what stores the details about a Dataset and how it relates to a database. If this Dataset was pulled from a database, the info field would be populated with a DatasetInfo object. Of note: if there is a DatasetInfo item attached to the info attribute, all other attributes become immutable as that would break the usage of the database. Do not, malform, mutate, or change a Dataset's underlying object data. If you do, the purpose of this package to track, version, deduplicate, and store your data is moot. There are checks in place to detect if a dataset has been malformed in between creation/ ingestion, getting, and processing that will throw errors if differences are found.
+As you can see from the above representation (`repr`) of the Dataset, in the case of a dataframe like object, a Dataset will be created and the minimum validation fields are created but not validated yet. The minimum validation requirements for dataframe like objects are `filepath_columns`, and validated `types`, `values`, and `files`. There is additionally an "info" attribute, this is what stores the details about a Dataset and how it relates to a database. If this Dataset was pulled from a database, the info field would be populated with a DatasetInfo object. Of note: if there is a DatasetInfo item attached to the info attribute, all other attributes become immutable as that would break the usage of the database. Do not, malform, mutate, or change a Dataset's underlying object data. If you do, the purpose of this package to track, version, deduplicate, and store your data is moot. There are checks in place to detect if a dataset has been malformed in between creation/ ingestion, getting, and processing that will throw errors if differences are found.
 
 ### Import Dataset
 Due to the size that Datasets can become, and the desire to not have to connect, pull, and rebuild a Dataset object after every break in work. There is a simple pickle serialization of the Dataset object available.
@@ -75,7 +74,24 @@ ds
     obj: True,
     name: "test_dataset",
     description: None,
-    filepath_columns: None,
+    validated: {
+        types: False,
+        values: False,
+        files: False
+    }
+
+Additionally you can also initialize a Dataset object from a Quilt package. This is the reverse operation of taking a Dataset and exporting it to a Quilt package.
+
+```python
+from quilt.data.user import test_dataset
+ds = dsdb.Dataset(package)
+ds
+```
+
+    info: None,
+    obj: True,
+    name: "test_dataset",
+    description: None,
     validated: {
         types: False,
         values: False,
@@ -92,16 +108,16 @@ In the case of multiple dataframe like objects that share data across them you c
 *Cell Volume Dataset:* stored in database as Dataset 1
 
 |  | cell_id | cell_image | feature_cell_volume |
-|---|----------------------------------------|-------------------------------|---------------------|
-| 1 | "8f2dcec5-3d3d-407a-85c7-52e7583156aa" | "path/to/image/of/cell/1.png" | 3.20948 |
-| 2 | "1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe" | "path/to/image/of/cell/2.png” | 12.9723 |
+|:--:|:--|:--|--:|
+| 1 | "8f2dcec5-3d3d-407a-85c7-52e7583156aa" | "path/to/image/1.png" | 3.20948 |
+| 2 | "1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe" | "path/to/image/2.png” | 12.9723 |
 
 *Cell Height Dataset:* stored in database as Dataset 2
 
 |  | cell_id | cell_image | feature_cell_height |
-|---|----------------------------------------|-------------------------------|---------------------|
-| 1 | "8f2dcec5-3d3d-407a-85c7-52e7583156aa" | "path/to/image/of/cell/1.png" | 1.84235 |
-| 2 | "1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe" | "path/to/image/of/cell/2.png” | 6.12739 |
+|:--:|:--|:--|--:|
+| 1 | "8f2dcec5-3d3d-407a-85c7-52e7583156aa" | "path/to/image/1.png" | 1.84235 |
+| 2 | "1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe" | "path/to/image/2.png” | 6.12739 |
 
 You can then join these Datasets by simply merging by `cell_id`.
 ```python
@@ -113,7 +129,6 @@ ds
     obj: True,
     name: "merge_1_2",
     description: "created dataset using 'cell_id' found in datasets [1, 2]",
-    filepath_columns: "cell_image",
     validated: {
         types: True,
         values: True,
@@ -134,7 +149,7 @@ You could form this into a dataframe like Dataset by simply putting it into a si
 ***Example in Dataframe:***
 
 |  | unclassified_images |
-|---|----------------------------------|
+|:--:|:--|
 | 1 | "path/to/unclassified/image.png" |
 
 Instead you can write a custom [Introspector](../datasetdatabase/introspect/introspector.py) for that object that informs the Dataset validation, deconstruction, and reconstruction of that object. You can view the [pandas DataFrame Introspector](../datasetdatabase/introspect/dataframe.py) as an example, but there is no limit to what custom Introspector you would like to use. Deconstruction is important during converting the object from it's standard form to a storable form in the database. Validation is used directly by the Dataset object and informs the object on whether or not the object is valid to be pushed into a database. And lastly, is reconstruction, which is the reverse operation of deconstruction. It informs the database on how to recreate the original object given its mapping of Iota, IotaGroup, and Group.
@@ -146,28 +161,28 @@ A more complex example is a Dataset of Datasets. There is occasionally a need fo
 *Image Data Dataset:* stored Dataset object with an attached DatasetInfo
 
 |  | unclassified_images |
-|---|----------------------------------|
-| 1 | "path/to/unclassified/image.png" |
+|:--:|:--|
+| 1 | "path/to/image/1.png" |
 
 *Models Available Dataset:* stored Dataset object with an attached DatasetInfo
 
 |  | path_to_serialized_model |
-|---|--------------------------|
+|:--:|:--|
 | 1 | "path/to/model/1.pkl" |
 | 2 | "path/to/model/2.pkl" |
 
 *Dataset of Datasets:*
 
 |  | dataset |
-|---|----------------|
+|:--:|:--|
 | 1 | images_dataset |
 | 2 | models_dataset |
 
 ***Expanded Single Dataset Example:*** Specific models against specific items in a dataset.
 
-||unclassified_images|apply_model_1|apply_model_2|
-|--|--|--|--|
-|1|"path/to/unclassified/image.png"|"path/to/model/1.pkl"|"path/to/model/2.pkl"|
+|  | unclassified_images | apply_model_1 | apply_model_2 |
+|:--:|:--|:--|:--|
+| 1 | "path/to/image/1.png" | "path/to/model/1.pkl" | "path/to/model/2.pkl" |
 
 There are benefits to both systems. In a Dataset of Datasets system your DatasetInfo objects are attached and thus you can pull data from multiple databases at the same time as well as ensure that everything is validated regardless of system. However on the expanded single dataset system, it is it's own Dataset, and regardless of other data, it will be locked to that version that will be easily accessible to anyone who wants to view how both the data and the models were prepared.
 
@@ -180,7 +195,7 @@ For dataframe like Datasets you can validate the types of each data point by sim
 If our underlying data is as follows:
 
 |  | foo | bar |
-|---|---------|-------|
+|:--:|:--|:--|
 | 1 | "hello" | True |
 | 2 | "world" | False |
 
@@ -205,7 +220,7 @@ Similarly, for dataframe like Datasets you can validate the values of each data 
 If our underlying data is as follows:
 
 |  | foo | bar |
-|---|---------|-------|
+|:--:|:--|:--|
 | 1 | "hello" | True |
 | 2 | "world" | False |
 
@@ -229,7 +244,7 @@ Files are more complex than data type and value checking. In the case where a Da
 If our underlying data is as follows:
 
 |  | foo | bar | files |
-|---|---------|-------|----------------------|
+|:--:|:--|:--|:--|
 | 1 | "hello" | True | "path/to/file/1.png" |
 | 2 | "world" | False | "path/to/file/2.png" |
 
@@ -240,7 +255,7 @@ This will begin a few operations. The first of which is that it will enforce tha
 After passing this parameter you will see your filepaths have changed to be the read paths from the FMS created files.
 
 |  | foo | bar | files |
-|---|---------|-------|-----------------------------------------|
+|:--:|:--|:--|:--|
 | 1 | "hello" | True | "quilt/store/objs/8912hujqds78fh122uas" |
 | 2 | "world" | False | "quilt/store/objs/a89qhjoiuahsd89fhnai" |
 
