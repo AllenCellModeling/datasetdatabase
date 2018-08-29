@@ -1,7 +1,7 @@
 # Format expected by setup.py and doc/source/conf.py: string of form "X.Y.Z"
 _version_major = 0
-_version_minor = 1
-_version_micro = 5
+_version_minor = 8
+_version_micro = 1
 _version_extra = 'dev'
 
 # Construct full version string from these.
@@ -29,7 +29,7 @@ long_description = """
 dataset database
 ========
 dataset database is the tools and functions library built to help
-AICS Modeling create and manage local and postgresql databases. It allows
+AICS Modeling create and manage local sqlite and postgresql databases. It allows
 arbitrary key value pairings to be tracked and managed through any processing
 step, algorithm, or function.
 Contact
@@ -38,15 +38,13 @@ Jackson Maxfield Brown
 jacksonb@alleninstitute.org
 License
 =======
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with
-this program. If not, see http://www.gnu.org/licenses/.
+`DatasetDatabase` is licensed under the terms of the MIT license. See the file
+"LICENSE" for information on the history of this software, terms & conditions
+for usage, and a DISCLAIMER OF ALL WARRANTIES.
+
+All trademarks referenced herein are property of their respective holders.
+Copyright (c) 2018--, Jackson Maxfield Brown, The Allen Institute for Cell
+Science.
 """
 
 NAME = "datasetdatabase"

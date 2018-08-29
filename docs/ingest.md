@@ -90,16 +90,16 @@ In the case of multiple dataframe like objects that share data across them you c
 ***Shared Data Points Example:*** Same image, multiple datasets, different features.
 
 *Cell Volume Dataset:* stored in database as Dataset 1
-||cell_id|cell_image|feature_cell_volume|
-|--|--|--|--|
-|1|"8f2dcec5-3d3d-407a-85c7-52e7583156aa"|"path/to/image/of/cell/1.png"|3.20948|
-|2|"1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe"|"path/to/image/of/cell/2.png"|12.9723|
+|  | cell_id | cell_image | feature_cell_volume |
+|---|----------------------------------------|-------------------------------|---------------------|
+| 1 | "8f2dcec5-3d3d-407a-85c7-52e7583156aa" | "path/to/image/of/cell/1.png" | 3.20948 |
+| 2 | "1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe" | "path/to/image/of/cell/2.png” | 12.9723 |
 
 *Cell Height Dataset:* stored in database as Dataset 2
-||cell_id|cell_image|feature_cell_height|
-|--|--|--|--|
-|1|"8f2dcec5-3d3d-407a-85c7-52e7583156aa"|"path/to/image/of/cell/1.png"|1.84235|
-|2|"1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe"|"path/to/image/of/cell/2.png"|6.12739|
+|  | cell_id | cell_image | feature_cell_height |
+|---|----------------------------------------|-------------------------------|---------------------|
+| 1 | "8f2dcec5-3d3d-407a-85c7-52e7583156aa" | "path/to/image/of/cell/1.png" | 1.84235 |
+| 2 | "1e93d4f6-7e34-4ca9-9c21-d6062b2cd7fe" | "path/to/image/of/cell/2.png” | 6.12739 |
 
 You can then join these Datasets by simply merging by `cell_id`.
 ```python
@@ -130,9 +130,9 @@ A simple example of this in practice could be that you want to run a single imag
 You could form this into a dataframe like Dataset by simply putting it into a single column, single row dataframe, but that is just a roundabout way of getting to what you want.
 
 ***Example in Dataframe:***
-||unclassified_images|
-|--|--|
-|1|"path/to/unclassified/image.png"|
+|  | unclassified_images |
+|---|----------------------------------|
+| 1 | "path/to/unclassified/image.png" |
 
 Instead you can write a custom [Introspector](../datasetdatabase/introspect/introspector.py) for that object that informs the Dataset validation, deconstruction, and reconstruction of that object. You can view the [pandas DataFrame Introspector](../datasetdatabase/introspect/dataframe.py) as an example, but there is no limit to what custom Introspector you would like to use. Deconstruction is important during converting the object from it's standard form to a storable form in the database. Validation is used directly by the Dataset object and informs the object on whether or not the object is valid to be pushed into a database. And lastly, is reconstruction, which is the reverse operation of deconstruction. It informs the database on how to recreate the original object given its mapping of Iota, IotaGroup, and Group.
 
@@ -141,21 +141,21 @@ A more complex example is a Dataset of Datasets. There is occasionally a need fo
 ***Dataset of Datasets Example:*** Specific models against specific items in a dataset.
 
 *Image Data Dataset:* stored Dataset object with an attached DatasetInfo
-||unclassified_images|
-|--|--|
-|1|"path/to/unclassified/image.png"|
+|  | unclassified_images |
+|---|----------------------------------|
+| 1 | "path/to/unclassified/image.png" |
 
 *Models Available Dataset:* stored Dataset object with an attached DatasetInfo
-||path_to_serialized_model|
-|--|--|
-|1|"path/to/model/1.pkl"|
-|2|"path/to/model/2.pkl"|
+|  | path_to_serialized_model |
+|---|--------------------------|
+| 1 | "path/to/model/1.pkl" |
+| 2 | "path/to/model/2.pkl" |
 
 *Dataset of Datasets:*
-||dataset|
-|--|--|
-|1|images_dataset|
-|2|models_dataset|
+|  | dataset |
+|---|----------------|
+| 1 | images_dataset |
+| 2 | models_dataset |
 
 ***Expanded Single Dataset Example:*** Specific models against specific items in a dataset.
 
@@ -172,10 +172,10 @@ There is inherent data validation when you attempt to push data to a Database or
 For dataframe like Datasets you can validate the types of each data point by simply passing a `type_validation_map` parameter.
 
 If our underlying data is as follows:
-||foo|bar|
-|--|--|--|
-|1|"hello"|True|
-|2|"world"|False|
+|  | foo | bar |
+|---|---------|-------|
+| 1 | "hello" | True |
+| 2 | "world" | False |
 
 A reasonable `type_validation_map` could be:
 
@@ -196,10 +196,10 @@ You can also use the `import_as_type_map=True` parameter to attempt to cast each
 Similarly, for dataframe like Datasets you can validate the values of each data point by simply passing a `value_validation_map` parameter.
 
 If our underlying data is as follows:
-||foo|bar|
-|--|--|--|
-|1|"hello"|True|
-|2|"world"|False|
+|  | foo | bar |
+|---|---------|-------|
+| 1 | "hello" | True |
+| 2 | "world" | False |
 
 A reasonable `value_validation_map` could be:
 
@@ -219,20 +219,20 @@ If you want to validate a specific subsection, in this case, data values, you wo
 Files are more complex than data type and value checking. In the case where a Dataset contains paths to files, it is recommended to inform the Dataset of such.
 
 Given a dataset as follows:
-||foo|bar|files|
-|--|--|--|--|
-|1|"hello"|True|"path/to/file/1.png"|
-|2|"world"|False|"path/to/file/2.png"|
+|  | foo | bar | files |
+|---|---------|-------|----------------------|
+| 1 | "hello" | True | "path/to/file/1.png" |
+| 2 | "world" | False | "path/to/file/2.png" |
 
 We can indicate to the Dataset initialization that the "files" column contains, well, filepaths. Simply pass a single string for a single column, or a list or tuple for multiple columns. `filepath_columns=["files"]`
 
 This will begin a few operations. The first of which is that it will enforce that all files found in the columns specified exist. The second of which is that it will create versioned, and deduplicated versions of those files using whichever [FMS module](./fms.md) you are using (By default this is a Quilt FMS). This is incredibly beneficial if you think the files found in the dataset may change, move, be deleted, etc. This not only ensures that your dataset will be an immutable object but also the files contained in the dataset.
 
 After passing this parameter you will see your filepaths have changed to be the read paths from the FMS created files.
-||foo|bar|files|
-|--|--|--|--|
-|1|"hello"|True|"quilt/store/objs/8912hujqds78fh122uas"|
-|2|"world"|False|"quilt/store/objs/a89qhjoiuahsd89fhnai"|
+|  | foo | bar | files |
+|---|---------|-------|-----------------------------------------|
+| 1 | "hello" | True | "quilt/store/objs/8912hujqds78fh122uas" |
+| 2 | "world" | False | "quilt/store/objs/a89qhjoiuahsd89fhnai" |
 
 If you want to turn this behavior off simply include `store_files=False`, but this is highly discouraged as there is no guarantee of an imutable Dataset without this.
 

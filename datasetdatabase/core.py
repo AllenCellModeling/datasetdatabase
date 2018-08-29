@@ -12,6 +12,7 @@ import json
 import abc
 
 # self
+from .introspect import Introspector
 from .schema import FMSInterface
 from .schema import SchemaVersion
 from .utils import checks
@@ -536,27 +537,19 @@ class DatasetInfo(object):
 
 class Dataset(object):
     def __init__(self,
-        dataset: Union[str, pathlib.Path, pd.DataFrame, None] = None,
+        dataset: object = None,
         ds_info: Union[DatasetInfo, None] = None,
         name: Union[str, None] = None,
         description: Union[str, None] = None,
-        filepath_columns: Union[str, List[str], None] = None,
-        type_validation_map: Union[Dict[str, type], None] = None,
-        value_validation_map: Union[Dict[str, types.FunctionType], None] = None,
-        import_as_type_map: bool = False,
-        replace_paths: Union[Dict[str, str], None] = None):
+        introspector: Union[Introspector, None] = None,
+        **kwargs):
 
         # enforce types
-        checks.check_types(dataset, [str, pathlib.Path,
-                                     pd.DataFrame, type(None)])
+        checks.check_types(dataset, object)
         checks.check_types(ds_info, [DatasetInfo, type(None)])
         checks.check_types(name, [str, type(None)])
         checks.check_types(description, [str, type(None)])
-        checks.check_types(filepath_columns, [str, list, type(None)])
-        checks.check_types(type_validation_map, [dict, type(None)])
-        checks.check_types(value_validation_map, [dict, type(None)])
-        checks.check_types(import_as_type_map, bool)
-        checks.check_types(replace_paths, [dict, type(None)])
+        checks.check_types(introspector, [Introspector, type(None)])
 
         # must provide dataset or ds_info
         assert dataset is not None or ds_info is not None, MISSING_INIT
