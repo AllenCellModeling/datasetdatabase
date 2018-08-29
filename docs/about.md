@@ -2,6 +2,20 @@
 
 Dataset Database (dsdb) is a python package for handling arbitrary datasets with little to no similarity between any given one. Additionally, it provides mechanisms for versioning, deduplicating, validation, and tracking datasets as they are ingested, processed, or created. While you do not have to use the database portions of this package, it is highly encouraged when conducting experiments and analysis as the database will allow you to properly version and track your analysis as you go.
 
+
+***Full Versioning, Deduplication, Validation, and Tracking of Arbitrary Datasets***
+```python
+ds = Dataset("data.csv")
+db = DatasetDatabase(config=dsdb.LOCAL)
+
+def generate_report(df, **kwargs):
+    report = pd.DataFrame()
+    ...
+    return report
+
+report = ds.process(generate_report, db)
+```
+
 ```
 Recent Datasets:
 --------------------------------------------------------------------------------
@@ -31,4 +45,4 @@ This is a completely open source project created at the Allen Institute for Cell
 
 Distributed under MIT License.
 
-**Last updated: 21 August 2018**
+**Last updated: 28 August 2018**
