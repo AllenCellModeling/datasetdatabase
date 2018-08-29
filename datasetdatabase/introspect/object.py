@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # installed
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union
 from datetime import datetime
 import pickle
 import types
@@ -64,11 +64,15 @@ class ObjectIntrospector(Introspector):
 
 
     def reconstruct(self, items: Dict[str, Dict[str, str]]) -> object:
-        return {}
+        self._obj = pickle.loads(items["Iota"]["Value"])
+        return self._obj
 
 
     def package(self):
-        return {}
+        package = {}
+        package["data"] = self.obj
+        package["files"] = None
+        return package
 
 
     def validate_attribute(self,
