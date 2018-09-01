@@ -5,8 +5,11 @@ import pandas as pd
 
 # self
 from .introspector import Introspector
-from .dataframe import DataFrameInspector
+from .dictionary import DictionaryIntrospector
+from .dataframe import DataFrameIntrospector
+from .object import ObjectIntrospector
 
 INTROSPECTOR_MAP = {
-    pd.DataFrame: DataFrameInspector
+    pd.DataFrame: DataFrameIntrospector,
+    dict: DictionaryIntrospector
 }

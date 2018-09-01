@@ -5,17 +5,17 @@ from typing import Union, Dict, List
 from datetime import datetime
 import pandas as pd
 import pathlib
+import hashlib
 import orator
 import pickle
 import types
 import json
-import abc
 
 # self
-from .introspect import Introspector
+from .introspect import Introspector, INTROSPECTOR_MAP, ObjectIntrospector
 from .schema import FMSInterface
 from .schema import SchemaVersion
-from .utils import checks
+from .utils import checks, tools
 
 from .version import VERSION
 
@@ -35,7 +35,8 @@ MISSING_INIT = "Must provide either a pandas DataFrame or a DatasetInfo object."
 EDITING_STORED_DATASET = "Datasets connected to DatasetInfo are immutable."
 TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
 
-APPROVED_EXTENSIONS = (".csv", ".tsv", ".dataset")
+EXTENSION_MAP = {".csv": pd.read_csv,
+                 ".dataset": tools.read_pickle}
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 
@@ -541,8 +542,7 @@ class Dataset(object):
         ds_info: Union[DatasetInfo, None] = None,
         name: Union[str, None] = None,
         description: Union[str, None] = None,
-        introspector: Union[Introspector, None] = None,
-        **kwargs):
+        introspector: Union[Introspector, None] = None):
 
         # enforce types
         checks.check_types(dataset, object)
@@ -559,8 +559,10 @@ class Dataset(object):
             return read_dataset(dataset)
 
         # core properties
-        self._dataframe = dataset
+        self._ds = dataset
         self._info = ds_info
+        self._md5 = tools.get_object_hash(self.ds)
+        self._sha256 = tools.get_object_hash(self.ds, hashlib.sha256)
 
         # unpack based on info
         # name
@@ -575,35 +577,18 @@ class Dataset(object):
         else:
             self.description = self.info.description
 
-        # filepath_columns
+        # introspector
         if self.info is None:
-            self.filepath_columns = filepath_columns
+            t_ds = type(self.ds)
+            if introspector is None:
+                if t_ds in INTROSPECTOR_MAP:
+                    self._introspector = INTROSPECTOR_MAP[t_ds](self.ds)
+                else:
+                    self._introspector = ObjectIntrospector(self.ds)
+            else:
+                self._introspector = introspector
         else:
-            self.filepath_columns = self.info.filepath_columns
-
-        # validation
-        if self.info is None:
-            self._validated = {"types": False,
-                              "values": False,
-                              "files": False}
-
-            # run validations
-            if import_as_type_map and type_validation_map is not None:
-                self.coerce_types_using_map(type_validation_map)
-            if replace_paths is not None:
-                self.replace_paths_using_map(replace_paths)
-            if filepath_columns is not None:
-                self.enforce_files_exist_from_columns(filepath_columns)
-            if type_validation_map is not None:
-                self.enforce_types_using_map(type_validation_map)
-            if value_validation_map is not None:
-                self.enforce_values_using_map(value_validation_map)
-
-        # equivalence check
-        # if dataset is not None and ds_info is not None:
-            # TODO:
-            # check database source hash
-            # against this object hash
+            self._introspector = self.info.introspector
 
 
     @property
@@ -612,134 +597,42 @@ class Dataset(object):
 
 
     @property
-    def df(self):
+    def ds(self):
         # get dataset if not in memory
-        if self._dataframe is None:
+        if self._ds is None:
             return self.info.origin.get_dataset(self.info.id)
 
-        return self._dataframe
+        return self._ds
+
+
+    @property
+    def introspector(self):
+        return self._introspector
+
+
+    @property
+    def md5(self):
+        return self._md5
+
+
+    @property
+    def sha256(self):
+        return self._sha256
 
 
     @property
     def state(self):
-        df_preped = True
-        if self._dataframe is None:
-            df_preped = False
-
+        ds_ready = self.ds is not None
         state = {"info": self.info,
-                 "df": df_preped,
+                 "ds": ds_ready,
                  "name": self.name,
                  "description": self.description,
-                 "filepath_columns": self.filepath_columns,
-                 "validated_items": self._validated}
+                 "introspector": type(self.introspector),
+                 "validated": self.introspector.validated,
+                 "md5": self.md5,
+                 "sha256": self.sha256}
 
         return state
-
-
-    def coerce_types_using_map(self,
-        type_map: Union[Dict[str, type], None] = None):
-        # assert new dataset
-        assert self.info is None, EDITING_STORED_DATASET
-
-        # enforce types
-        checks.check_types(type_map, [dict, type(None)])
-
-        # update type validation map
-        self.type_validation_map = type_map
-
-        # run casts
-        if self.type_validation_map is not None:
-            print("Casting values to type map...")
-            checks.format_dataset(self.df, self.type_validation_map)
-
-        # updated validated
-        self._validated["values"] = False
-        self._validated["types"] = False
-
-
-    def replace_paths_using_map(self,
-        path_replace: Union[Dict[str, str], None] = None):
-        # assert new dataset
-        assert self.info is None, EDITING_STORED_DATASET
-
-        # enforce types
-        checks.check_types(path_replace, [dict, type(None)])
-
-        # update replace paths map
-        self.replace_paths = path_replace
-
-        # run replace
-        if self.replace_paths is not None and self.filepath_columns is not None:
-            print("Fixing filepaths using {r}...".format(r=self.replace_paths))
-            checks.format_paths(self.df,
-                                self.filepath_columns,
-                                self.replace_paths)
-
-        # update validated
-        self._validated["values"] = False
-
-
-    def enforce_files_exist_from_columns(self,
-        fp_cols: Union[str, List[str], None] = None):
-        # assert new dataset
-        assert self.info is None, EDITING_STORED_DATASET
-
-        # enforce types
-        checks.check_types(fp_cols, [str, list, type(None)])
-
-        # update filepath columns
-        self.filepath_columns = fp_cols
-
-        # run exists
-        if self.filepath_columns is not None:
-            print("Checking files exist...")
-            checks.validate_dataset_files(self.df,
-                                          self.filepath_columns)
-
-        # update validated
-        self._validated["files"] = True
-
-
-    def enforce_types_using_map(self,
-        type_map: Union[Dict[str, type], None] = None):
-        # assert new dataset
-        assert self.info is None, EDITING_STORED_DATASET
-
-        # enforce types
-        checks.check_types(type_map, [dict, type(None)])
-
-        # update type validation map
-        self.type_validation_map = type_map
-
-        # run type checks
-        if self.type_validation_map is not None:
-            print("Checking dataset value types...")
-            checks.validate_dataset_types(self.df,
-                                          self.type_validation_map)
-
-        # update validated
-        self._validated["types"] = True
-
-
-    def enforce_values_using_map(self,
-        value_map: Union[Dict[str, types.FunctionType], None] = None):
-        # assert new dataset
-        assert self.info is None, EDITING_STORED_DATASET
-
-        # enforce types
-        checks.check_types(value_map, [dict, type(None)])
-
-        # update value validation map
-        self.value_validation_map = value_map
-
-        # run value checks
-        if self.value_validation_map is not None:
-            print("Checking dataset values...")
-            checks.validate_dataset_values(self.df,
-                                           self.value_validation_map)
-
-        # update validated
-        self._validated["values"] = True
 
 
     def upload_to(self, database: DatasetDatabase) -> DatasetInfo:
@@ -747,7 +640,7 @@ class Dataset(object):
         checks.check_types(database, DatasetDatabase)
 
         # run upload
-        return database.upload_dataset(self)
+        self.info = database.upload_dataset(self)
 
 
     def apply(self,
@@ -761,31 +654,21 @@ class Dataset(object):
         return
 
 
-    def save(self,
-        path: Union[str, pathlib.Path],
-        as_type: str = DATASET_EXTENSION,
-        **kwargs) -> pathlib.Path:
+    def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:
         # enforce types
         checks.check_types(path, [str, pathlib.Path])
 
         # convert types
         path = pathlib.Path(path)
-        if as_type[0] != ".":
-            as_type = "." + as_type
 
         # dump dataset
-        if as_type == DATASET_EXTENSION:
-            path = path.with_suffix(".dataset")
-            with open(path, "wb") as write_out:
-                to_save = Dataset(self.df,
-                                  self.info,
-                                  self.name,
-                                  self.description,
-                                  self.filepath_columns)
-                pickle.dump(to_save, write_out, **kwargs)
-        else:
-            path = path.with_suffix(as_type)
-            self.dataframe.to_csv(path, **kwargs)
+        path = path.with_suffix(".dataset")
+        to_save = Dataset(self.ds,
+                          self.info,
+                          self.name,
+                          self.description,
+                          self.introspector)
+        tools.write_pickle(to_save, path)
 
         return path
 
@@ -812,24 +695,17 @@ def read_dataset(path: Union[str, pathlib.Path]):
     # convert types
     path = pathlib.Path(path)
 
-    # enforce paths
-    assert path.suffix in APPROVED_EXTENSIONS, UNKNOWN_EXTENSION.format(p=path)
+    # attempt read
+    try:
+        if path.suffix in EXTENSION_MAP:
+            ds = EXTENSION_MAP[path.suffix](path)
+        else:
+            ds = tools.read_pickle(path)
+    except pickle.UnpicklingError:
+        UNKNOWN_EXTENSION.format(p=path)
 
-    # read csv
-    if path.suffix == ".csv":
-        dataset = pd.read_csv(path)
-        path = path.with_suffix("")
-        return Dataset(dataset=dataset, name=path.name)
-
-    # read tsv
-    if path.suffix == ".tsv":
-        dataset = pd.read_csv(path, sep="\t")
-        path = path.with_suffix("")
-        return Dataset(dataset=dataset, name=path.name)
-
-    # read packaged dataset
-    with open(path, "rb") as read_in:
-        return pickle.load(read_in)
+    # return
+    return Dataset(ds)
 
 
 # delayed globals

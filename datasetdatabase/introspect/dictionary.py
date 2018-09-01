@@ -7,20 +7,19 @@ import pickle
 import types
 
 # self
+from ..utils import checks, ProgressBar
 from .introspector import Introspector
-from ..utils import checks
 
 
-class ObjectIntrospector(Introspector):
+class DictionaryIntrospector(Introspector):
     """
-    General object introspector. Using a single all attribute validation map,
-    you can ingest, validate, and deconstruct, an object. There is limited
-    functionality due to how generalizable this Introspector needs to be.
+    General dictionary introspector. Ingest a dictionary, create and validate,
+    Iota, etc.
     """
 
     def __init__(self, obj: object):
         self._obj = obj
-        self._validated = False
+        self._validated = {k: False for k in self.obj}
 
 
     @property
@@ -42,12 +41,9 @@ class ObjectIntrospector(Introspector):
 
         # validate
         if item_validation_map is not None:
-            for i, f in item_validation_map.items():
-                if not self.validate_attribute(i, f):
-                    raise ValueError("Attribute failed validation: {a}"
-                                    .format(a=i))
-
-            self._validated = True
+            new_validations = {k: self.validate_key(k, item_validation_map[k])
+                                for k in item_validation_map}
+            self._validated = {**self._validated, **new_validations}
 
 
     def deconstruct(self) -> Dict[str, List[Dict[str, object]]]:
@@ -56,18 +52,21 @@ class ObjectIntrospector(Introspector):
         # all iota are created at the same time
         created = datetime.now()
 
-        storage["Iota"] = [{"Key": "obj",
-                            "Value": pickle.dumps(self.obj),
-                            "Created": created}]
+        storage["Iota"] = [{"Key": k,
+                            "Value": pickle.dumps(v),
+                            "Created": created}
+                            for k, v in self.obj.items()]
         storage["Group"] = [{"Created": created}]
-        storage["IotaGroup"] = [{"IotaId": 0,
+        storage["IotaGroup"] = [{"IotaId": i,
                                  "GroupId": 0,
-                                 "Created": created}]
+                                 "Created": created}
+                                 for i in range(len(storage["Iota"]))]
         return storage
 
 
     def reconstruct(self, items: Dict[str, Dict[str, object]]) -> object:
-        self._obj = pickle.loads(items["Iota"][0]["Value"])
+        self._obj = {i["Key"]: pickle.loads(i["Value"])
+                        for i in items["Iota"]}
         return self.obj
 
 
@@ -78,8 +77,8 @@ class ObjectIntrospector(Introspector):
         return package
 
 
-    def validate_attribute(self,
-        item: str,
+    def validate_key(self,
+        key: str,
         func: Union[types.ModuleType, types.FunctionType]) -> bool:
 
-        return func(getattr(self.obj, item))
+        return func(self.obj[key])

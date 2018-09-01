@@ -15,10 +15,11 @@ class ProgressBar(object):
     management and easier update.
     """
 
-    def __init__(self, max: int, bar_length: int = 60):
+    def __init__(self, max: int, bar_length: int = 60, increment: int = 1):
         self.current = 0
         self.max = max
         self.start = time.time()
+        self.increment_by = increment
 
         # to calc
         self.bar_length = bar_length
@@ -29,8 +30,8 @@ class ProgressBar(object):
         self.update_time_str()
 
 
-    def increment(self, add: int = 1):
-        self.current += add
+    def increment(self):
+        self.current += self.increment_by
         self.draw()
 
 

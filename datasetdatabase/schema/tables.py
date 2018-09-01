@@ -43,7 +43,27 @@ def create_Group(schema: orator.Schema):
     if not schema.has_table("Group"):
         with schema.create("Group") as table:
             table.increments("GroupId")
+            table.integer("Label")
             table.datetime("Created")
+
+def create_IotaGroup(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("IotaGroup"):
+        with schema.create("IotaGroup") as table:
+            table.increments("IotaGroupId")
+            table.integer("IotaId").unsigned()
+            table.integer("GroupId").unsigned()
+            table.datetime("Created")
+            table.unique(["IotaId", "GroupId"])
+            table.foreign("IotaId") \
+                 .references("IotaId") \
+                 .on("Iota")
+            table.foreign("GroupId") \
+                 .references("GroupId") \
+                 .on("Group")
 
 
 def create_Source(schema: orator.Schema):
@@ -108,24 +128,6 @@ def create_Dataset(schema: orator.Schema):
                  .references("SourceId") \
                  .on("Source")
 
-def create_IotaGroup(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("IotaGroup"):
-        with schema.create("IotaGroup") as table:
-            table.increments("IotaGroupId")
-            table.integer("IotaId").unsigned()
-            table.integer("GroupId").unsigned()
-            table.datetime("Created")
-            table.unique(["IotaId", "GroupId"])
-            table.foreign("IotaId") \
-                 .references("IotaId") \
-                 .on("Iota")
-            table.foreign("GroupId") \
-                 .references("GroupId") \
-                 .on("Group")
 
 def create_GroupDataset(schema: orator.Schema):
     # enforce types
@@ -142,6 +144,41 @@ def create_GroupDataset(schema: orator.Schema):
             table.foreign("GroupId") \
                  .references("GroupId") \
                  .on("Group")
+            table.foreign("DatasetId") \
+                 .references("DatasetId") \
+                 .on("Dataset")
+
+
+def create_Annotation(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("Annotation"):
+        with schema.create("Annotation") as table:
+            table.increments("AnnotationId")
+            table.integer("UserId").unsigned()
+            table.string("Value")
+            table.datetime("Created")
+            table.foreign("UserId") \
+                 .references("UserId") \
+                 .on("User")
+
+
+def create_AnnotationDataset(schema: orator.Schema):
+    # enforce types
+    checks.check_types(schema, orator.Schema)
+
+    # create table
+    if not schema.has_table("AnnotationDataset"):
+        with schema.create("AnnotationDataset") as table:
+            table.increments("AnnotationDatasetId")
+            table.integer("AnnotationId").unsigned()
+            table.integer("DatasetId").unsigned()
+            table.datetime("Created")
+            table.foreign("AnnotationId") \
+                 .references("AnnotationId") \
+                 .on("Annotation")
             table.foreign("DatasetId") \
                  .references("DatasetId") \
                  .on("Dataset")

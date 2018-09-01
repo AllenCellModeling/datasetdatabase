@@ -2,16 +2,13 @@
 
 # installed
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Union
-import pandas as pd
-import numpy as np
 import pathlib
+import hashlib
 import pickle
-import time
+import types
 import math
 import sys
-import ast
 import os
 
 # self
@@ -49,109 +46,69 @@ def convert_size(size_bytes):
     return "%s %s" % (s, BYTE_SIZES[i])
 
 
-def get_yes_no_input(message: str = "") -> bool:
-    while True:
-        try:
-            answer = str(input(message))
-        except ValueError:
-            print("Sorry, I didn't understand that.")
-            continue
-
-        answer = answer.lower()
-        if answer in (ALLOWED_YES + ALLOWED_NO):
-            if answer in ALLOWED_YES:
-                return True
-
-            return False
-        else:
-            print("Your response must not be one of the following: {a}"\
-                    .format(a=(ALLOWED_YES + ALLOWED_NO)))
-
-
-def write_dataset_readme(ds_info: dict,
-                         path: Union[str, pathlib.Path, None] = None) \
-                         -> pathlib.Path:
+def write_pickle(obj: object, path: Union[str, pathlib.Path]) -> pathlib.Path:
     # enforce types
-    checks.check_types(ds_info, dict)
-    checks.check_types(path, [str, pathlib.Path, type(None)])
+    checks.check_types(obj, object)
+    checks.check_types(path, [str, pathlib.Path])
 
     # convert types
-    if isinstance(path, str):
-        path = pathlib.Path(path)
+    path = pathlib.Path(path)
 
-    # construct readme
-    # name
-    readme = ""
-    readme += "# " + ds_info["Name"] + ":"
-    readme += "\n\n"
-
-    # description
-    if ds_info["Description"] is not None:
-        readme += "## Description:"
-        readme += "\n"
-        readme += ds_info["Description"]
-        readme += "\n\n"
-
-    if ds_info["FilepathColumns"] is not None:
-        readme += "## Filepath Columns:"
-        readme += "\n"
-        readme += ds_info["FilepathColumns"]
-        readme += "\n\n"
-
-    # created
-    readme += "## Created:"
-    readme += "\n"
-    readme += str(ds_info["Created"])
-    readme += "\n\n"
-
-    # source
-    readme += "## Origin SourceId:"
-    readme += "\n"
-    readme += str(ds_info["SourceId"])
-    readme += "\n\n"
-
-    # create path
-    if path is None:
-        path = os.getcwd()
-        path = pathlib.Path(path)
-        path /= (str(ds_info["SourceId"]) + "_readme.md")
-
-    # ensure dirs
-    try:
-        os.makedirs(path.parent)
-    except FileExistsError:
-        pass
-
-    # dump
-    with open(path, "w") as write_out:
-        write_out.write(readme)
+    with open(path, "wb") as write_out:
+        pickle.dump(obj, path)
 
     return path
 
 
-def parse_readme(filepath: Union[str, pathlib.Path]) -> dict:
+def read_pickle(path: Union[str, pathlib.Path]) -> object:
     # enforce types
-    checks.check_types(filepath, [str, pathlib.Path])
-    checks.check_file_exists(filepath)
+    checks.check_types(path, [str, pathlib.Path])
 
     # convert types
-    filepath = pathlib.Path(filepath)
+    path = pathlib.Path(path)
 
-    # read contents
-    with open(filepath, "r") as read_in:
-        lines = read_in.readlines()
+    with open(path, "rb") as read_in:
+        obj = pickle.load(read_in)
 
-    # default contents
-    info = {"Description": None,
-            "FilepathColumns": None}
+    return obj
 
-    # parse contents
-    for i, line in enumerate(lines):
-        if line.startswith("## "):
-            if "## Description:" in line:
-                info["Description"] = lines[i + 1].replace("\n", "")
-            if "## Filepath Columns:" in line:
-                cols = lines[i + 1].replace("\n", "")
-                info["FilepathColumns"] = ast.literal_eval(cols)
 
-    return info
+def get_file_hash(path: Union[str, pathlib.Path],
+    alg: types.BuiltinMethodType = hashlib.md5) -> str:
+    # enforce types
+    checks.check_types(path, [str, pathlib.Path])
+    checks.check_types(alg, types.BuiltinMethodType)
+
+    # convert types
+    path = pathlib.Path(path)
+
+    # get hash
+    with open(path, "rb") as read_in:
+        return get_object_hash(read_in, alg)
+
+
+def get_object_hash(obj: object,
+    alg: types.BuiltinMethodType = hashlib.md5) -> str:
+    # enforce types
+    checks.check_types(obj, object)
+    checks.check_types(alg, types.BuiltinMethodType)
+
+    # hash
+    return alg(pickle.dumps(obj)).hexdigest()
+
+
+def quick_cast(value, cast_type, info=None):
+    try:
+        if not isinstance(value, cast_type):
+            return cast_type(value)
+    except ValueError:
+        raise ValueError("Could not cast:", value,
+                         "to:", cast_type,
+                         "\ninfo:", info)
+
+    return value
+
+
+def _assert_value(f, val, err):
+    # get pass fail
+    assert f(val), err
