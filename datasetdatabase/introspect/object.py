@@ -59,7 +59,8 @@ class ObjectIntrospector(Introspector):
         storage["Iota"] = [{"Key": "obj",
                             "Value": pickle.dumps(self.obj),
                             "Created": created}]
-        storage["Group"] = [{"Created": created}]
+        storage["Group"] = [{"Label": 0,
+                             "Created": created}]
         storage["IotaGroup"] = [{"IotaId": 0,
                                  "GroupId": 0,
                                  "Created": created}]

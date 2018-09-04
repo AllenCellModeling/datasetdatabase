@@ -304,9 +304,11 @@ class DatasetDatabase(object):
                 {"Name": user,
                  "Description": description,
                  "Created": datetime.now()})
+
         # found
         if len(user_info) == 1:
             return user_info[0]
+
         # database structure error
         raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
@@ -322,7 +324,69 @@ class DatasetDatabase(object):
         if not isinstance(dataset, Dataset):
             dataset = Dataset(dataset, **kwargs)
 
-        return
+        # check hash
+        found_ds = self.get_items_from_table(
+            "Dataset", ["MD5", "=", dataset.md5])
+
+        # found
+        if len(found_ds) == 1:
+            return DatasetInfo(found_ds[0])
+
+        # not found
+        elif len(found_ds) == 0:
+            ds_info = {"Name": dataset.name,
+                       "Description": dataset.description,
+                       "SourceId": 0,
+                       "Introspector": str(type(dataset.introspector)),
+                       "MD5": dataset.md5,
+                       "SHA256": dataset.sha256,
+                       "Created": dataset.created}
+            ds_info["DatasetId"] = self.db.table("Dataset")\
+                .insert_get_id(ds_info, sequence=("DatasetId"))
+            ds_info = DatasetInfo(ds_info)
+
+        # database structure error
+        else:
+            raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+
+        # deconstruct
+        storage = dataset.introspector.deconstruct()
+
+        iota_ids = []
+        # insert iota
+        for i, iota in enumerate(storage["Iota"]):
+            match = {"list_index": i,
+                     "db_id": self._insert_to_table("Iota", iota)["IotaId"]}
+            iota_ids.append(match)
+
+        # insert groups
+        group_ids = []
+        for i, group in enumerate(storage["Group"]):
+            match = {"list_index": i,
+                     "db_id": self._insert_to_table("Group", group)["GroupId"]}
+            group_ids.append(match)
+
+        # insert iota group joins
+        iota_group_ids = []
+        for i, iota_group in enumerate(storage["IotaGroup"]):
+            iota_match = list(filter(lambda iota_id:
+                iota_id["list_index"] == iota_group["IotaId"], iota_ids))[0]
+            group_match = list(filter(lambda group_id:
+                group_id["list_index"] == iota_group["GroupId"], group_ids))[0]
+            db_iota_group = {"IotaId": iota_match["db_id"],
+                             "GroupId": group_match["db_id"],
+                             "Created": iota_group["Created"]}
+            iota_group_ids.append(self._insert_to_table(
+                "IotaGroup", db_iota_group)["IotaGroupId"])
+
+        # insert group dataset joins
+        for group_id_match in group_ids:
+            group_dataset = {"GroupId": group_id_match["db_id"],
+                             "DatasetId": ds_info.id,
+                             "Created": datetime.now()}
+            self._insert_to_table("GroupDataset", group_dataset)
+
+        return ds_info
 
 
     def get_dataset(self, id=0):
@@ -365,7 +429,7 @@ class DatasetDatabase(object):
         checks.check_types(items, dict)
 
         # create conditions
-        conditions = [[k, "=", v] for k, v in items.items()]
+        conditions = [[k, "=", v] for k, v in items.items() if k != "Created"]
 
         # check exists
         found_items = self.get_items_from_table(table, conditions)
@@ -437,37 +501,38 @@ class DatasetInfo(object):
         DatasetId: int,
         Name: str,
         SourceId: int,
+        Introspector: str,
+        MD5: str,
+        SHA256: str,
         Created: datetime,
         OriginDb: DatasetDatabase,
-        Description: Union[str, None] = None,
-        FilepathColumns: Union[str, None] = None):
+        Description: Union[str, None] = None):
 
         # enforce types
         checks.check_types(DatasetId, int)
         checks.check_types(Name, str)
         checks.check_types(Description, [str, type(None)])
-        checks.check_types(FilepathColumns, [str, type(None)])
         checks.check_types(SourceId, int)
+        checks.check_types(Introspector, str)
+        checks.check_types(MD5, str)
+        checks.check_types(SHA256, str)
         checks.check_types(Created, datetime)
         checks.check_types(OriginDb, DatasetDatabase)
 
         self._original_description = Description
-        self._original_fp_cols = FilepathColumns
 
         # convert types
         if Description is None:
             Description = ""
-        if FilepathColumns is None:
-            FilepathColumns = []
-        if isinstance(FilepathColumns, str):
-            FilepathColumns = FilepathColumns.split(FILEPATH_COL_SEP)
 
         # set attributes
         self._id = DatasetId
         self._name = Name
         self._description = Description
-        self._fp_cols = FilepathColumns
         self._source_id = SourceId
+        self._introspector = Introspector
+        self._md5 = MD5
+        self._sha256 = SHA256
         self._created = Created
         self._origin = OriginDb
 
@@ -491,13 +556,23 @@ class DatasetInfo(object):
 
 
     @property
-    def filepath_columns(self):
-        return self._fp_cols
+    def source_id(self):
+        return self._source_id
 
 
     @property
-    def source_id(self):
-        return self._source_id
+    def introspector(self):
+        return self._introspector
+
+
+    @property
+    def md5(self):
+        return self._md5
+
+
+    @property
+    def sha256(self):
+        return self._sha256
 
 
     @property
@@ -515,8 +590,10 @@ class DatasetInfo(object):
                 ["DatasetId", "=", self.id],
                 ["Name", "=", self.name],
                 ["Description", "=", self._original_description],
-                ["FilepathColumns", "=", self._original_fp_cols],
                 ["SourceId", "=", self.sourceid],
+                ["Introspector", "=", self.introspector],
+                ["MD5", "=", self.md5],
+                ["SHA256", "=", self.sha256],
                 ["Created", "=", self.created]
         ])
 
@@ -527,9 +604,12 @@ class DatasetInfo(object):
         return str({"id": self.id,
                     "name": self.name,
                     "description": self.description,
-                    "filepath_columns": self.filepath_columns,
                     "source_id": self.source_id,
-                    "created": self.created})
+                    "introspector": self.introspector,
+                    "md5": self.md5,
+                    "sha256": self.sha256,
+                    "created": self.created,
+                    "origin": self.origin})
 
 
     def __repr__(self):
@@ -558,15 +638,31 @@ class Dataset(object):
         if isinstance(dataset, (str, pathlib.Path)):
             return read_dataset(dataset)
 
-        # core properties
-        self._ds = dataset
+        # info
         self._info = ds_info
+
+        # introspector
+        if self.info is None:
+            if introspector is None:
+                t_ds = type(dataset)
+                if t_ds in INTROSPECTOR_MAP:
+                    self._introspector = INTROSPECTOR_MAP[t_ds](dataset)
+                else:
+                    self._introspector = ObjectIntrospector(dataset)
+            else:
+                self._introspector = introspector
+        else:
+            self._introspector = self.info.introspector
+
+        # update hashes
         self._md5 = tools.get_object_hash(self.ds)
         self._sha256 = tools.get_object_hash(self.ds, hashlib.sha256)
 
         # unpack based on info
         # name
         if self.info is None:
+            if name is None:
+                name = self.md5
             self.name = name
         else:
             self.name = self.info.name
@@ -577,18 +673,11 @@ class Dataset(object):
         else:
             self.description = self.info.description
 
-        # introspector
+        # created
         if self.info is None:
-            t_ds = type(self.ds)
-            if introspector is None:
-                if t_ds in INTROSPECTOR_MAP:
-                    self._introspector = INTROSPECTOR_MAP[t_ds](self.ds)
-                else:
-                    self._introspector = ObjectIntrospector(self.ds)
-            else:
-                self._introspector = introspector
+            self.created = datetime.now()
         else:
-            self._introspector = self.info.introspector
+            self.created = self.info.created
 
 
     @property
@@ -599,10 +688,12 @@ class Dataset(object):
     @property
     def ds(self):
         # get dataset if not in memory
-        if self._ds is None:
-            return self.info.origin.get_dataset(self.info.id)
+        if self.introspector.obj is None:
+            ds = self.info.origin.get_dataset(self.info.id)
+            self._introspector._obj = ds
+            return ds
 
-        return self._ds
+        return self.introspector.obj
 
 
     @property
@@ -640,7 +731,7 @@ class Dataset(object):
         checks.check_types(database, DatasetDatabase)
 
         # run upload
-        self.info = database.upload_dataset(self)
+        self._info = database.upload_dataset(self)
 
 
     def apply(self,

@@ -211,8 +211,7 @@ class DataFrameIntrospector(Introspector):
     def _create_Group(self, row, storage):
         # create group
         created = datetime.now()
-        group = {"GroupId": row.name,
-                 "Label": row.name,
+        group = {"Label": row.name,
                  "Created": created}
 
         # add group

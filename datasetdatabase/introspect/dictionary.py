@@ -56,7 +56,8 @@ class DictionaryIntrospector(Introspector):
                             "Value": pickle.dumps(v),
                             "Created": created}
                             for k, v in self.obj.items()]
-        storage["Group"] = [{"Created": created}]
+        storage["Group"] = [{"Label": 0,
+                             "Created": created}]
         storage["IotaGroup"] = [{"IotaId": i,
                                  "GroupId": 0,
                                  "Created": created}
