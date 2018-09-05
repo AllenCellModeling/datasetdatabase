@@ -196,6 +196,7 @@ def create_Algorithm(schema: orator.Schema):
             table.string("Name")
             table.string("Description").nullable()
             table.string("Version")
+            table.string("MD5")
             table.datetime("Created")
             table.unique(["Name", "Version"])
 
@@ -212,7 +213,7 @@ def create_Run(schema: orator.Schema):
             table.integer("UserId").unsigned()
             table.string("Name").nullable()
             table.string("Description").nullable()
-            table.text("AlgorithmParameters").nullable()
+            table.integer("AlgorithmParameters").unsigned()
             table.datetime("Begin")
             table.datetime("End")
             table.foreign("AlgorithmId") \
@@ -221,6 +222,9 @@ def create_Run(schema: orator.Schema):
             table.foreign("UserId") \
                  .references("UserId") \
                  .on("User")
+            table.foreign("AlgorithmParameters") \
+                 .references("DatasetId") \
+                 .on("Dataset")
 
 
 def create_RunInput(schema: orator.Schema):
