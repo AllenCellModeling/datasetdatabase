@@ -4,6 +4,7 @@
 from typing import Union, Dict, List
 from datetime import datetime
 import pandas as pd
+import importlib
 import inspect
 import pathlib
 import hashlib
@@ -272,6 +273,10 @@ class DatasetDatabase(object):
     def user(self):
         return self._user
 
+    @property
+    def user_info(self):
+        return self._user_info
+
 
     @property
     def constructor(self):
@@ -374,11 +379,9 @@ class DatasetDatabase(object):
         # enforce version string
         version = str(version)
 
-        # hash
-        md5 = hashib.md5(pickle.dumps(algorithm)).hexdigest()
-
         # get or create alg
-        alg_info = self.get_items_from_table("Algorithm", ["MD5", "=", md5])
+        alg_info = self.get_items_from_table("Algorithm", [
+            ["Name", "=", name], ["Version", "=", version]])
 
         # found
         if len(alg_info) == 1:
@@ -389,7 +392,6 @@ class DatasetDatabase(object):
                 {"Name": name,
                  "Description": description,
                  "Version": version,
-                 "MD5": md5,
                  "Created": datetime.now()})
             return alg_info
 
@@ -436,7 +438,23 @@ class DatasetDatabase(object):
 
         # convert dataset to workable type
         if input_dataset is not None:
-            input = input_dataset
+            # check hash
+            found_ds = self.get_items_from_table(
+                "Dataset", ["MD5", "=", input_dataset.md5])
+
+            # found
+            if len(found_ds) == 1:
+                input_dataset._info = DatasetInfo(found_ds[0])
+                input = input_dataset
+
+            # not found
+            elif len(found_ds) == 0:
+                input = input_dataset
+
+            # database structure error
+            else:
+                raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+
         elif input_dataset_info is not None:
             input = input_dataset_info.origin.get_dataset(input_dataset_info.id)
         elif input_dataset_id is not None:
@@ -451,8 +469,8 @@ class DatasetDatabase(object):
                                                 algorithm_version)
 
         # store params used
-        alg_params = Dataset(algorithm_parameters)
-        alg_params_info = self._create_dataset(alg_params)
+        alg_params_ds = self._create_dataset(algorithm_parameters,
+            description="algorithm parameters")
 
         # begin
         begin = datetime.now()
@@ -460,17 +478,38 @@ class DatasetDatabase(object):
         # run
         output = algorithm(input, **algorithm_parameters)
 
-        # enforce dataset type
-        if not isinstance(output, Dataset):
-            output = Dataset(output)
-
         # ingest output
-        self._create_dataset(output,
+        output = self._create_dataset(output,
                              name=output_dataset_name,
                              description=output_dataset_description)
 
         # end
         end = datetime.now()
+
+        # update run table
+        run_info = self._insert_to_table("Run",
+            {"AlgorithmId": alg_info["AlgorithmId"],
+             "UserId": self.user_info["UserId"],
+             "Name": run_name,
+             "Description": run_description,
+             "AlgorithmParameters": alg_params_ds.info.id,
+             "Begin": begin,
+             "End": end})
+
+        # update run input table
+        if input.info is not None:
+            self._insert_to_table("RunInput",
+                {"RunId": run_info["RunId"],
+                 "DatasetId": input.info.id,
+                 "Created": end})
+
+        # update run output table
+        self._insert_to_table("RunOutput",
+            {"RunId": run_info["RunId"],
+             "DatasetId": output.info.id,
+             "Created": end})
+
+        return output
 
 
     def _create_dataset(self,
@@ -490,20 +529,27 @@ class DatasetDatabase(object):
 
         # found
         if len(found_ds) == 1:
-            return DatasetInfo(found_ds[0])
+            ds_info = found_ds[0]
+            ds_info["OriginDb"] = self
+            return DatasetInfo(**ds_info)
 
         # not found
         elif len(found_ds) == 0:
+            introspector_module = str(type(dataset.introspector))
+            begin = len("<class '")
+            end = introspector_module.index("'>")
+            introspector_module = introspector_module[begin: end]
             ds_info = {"Name": dataset.name,
                        "Description": dataset.description,
-                       "SourceId": 0,
-                       "Introspector": str(type(dataset.introspector)),
+                       "Introspector": introspector_module,
                        "MD5": dataset.md5,
                        "SHA256": dataset.sha256,
                        "Created": dataset.created}
             ds_info["DatasetId"] = self.db.table("Dataset")\
                 .insert_get_id(ds_info, sequence=("DatasetId"))
-            ds_info = DatasetInfo(ds_info)
+            ds_info["OriginDb"] = self
+
+            ds_info = DatasetInfo(**ds_info)
 
         # database structure error
         else:
@@ -547,7 +593,7 @@ class DatasetDatabase(object):
             self._insert_to_table("GroupDataset", group_dataset)
 
         # attach info to a dataset
-        return Dataset(ds_info = ds_info)
+        return Dataset(dataset = dataset.ds, ds_info = ds_info)
 
 
     def _upload_dataset(self, dataset, **params):
@@ -560,7 +606,7 @@ class DatasetDatabase(object):
         checks.check_types(dataset, Dataset)
 
         # enforce no change
-        current_hash = hashlib.md5(pickle.dumps(dataset.ds)).hexdigest()
+        current_hash = tools.get_object_hash(dataset.ds)
         assert current_hash == dataset.md5, UNKNOWN_DATASET_HASH
 
         create_params = {}
@@ -686,11 +732,10 @@ class DatasetInfo(object):
     def __init__(self,
         DatasetId: int,
         Name: str,
-        SourceId: int,
         Introspector: str,
         MD5: str,
         SHA256: str,
-        Created: datetime,
+        Created: Union[datetime, str],
         OriginDb: DatasetDatabase,
         Description: Union[str, None] = None):
 
@@ -698,11 +743,10 @@ class DatasetInfo(object):
         checks.check_types(DatasetId, int)
         checks.check_types(Name, str)
         checks.check_types(Description, [str, type(None)])
-        checks.check_types(SourceId, int)
         checks.check_types(Introspector, str)
         checks.check_types(MD5, str)
         checks.check_types(SHA256, str)
-        checks.check_types(Created, datetime)
+        checks.check_types(Created, [datetime, str])
         checks.check_types(OriginDb, DatasetDatabase)
 
         self._original_description = Description
@@ -710,12 +754,13 @@ class DatasetInfo(object):
         # convert types
         if Description is None:
             Description = ""
+        if isinstance(Created, str):
+            Created = datetime.strptime(Created)
 
         # set attributes
         self._id = DatasetId
         self._name = Name
         self._description = Description
-        self._source_id = SourceId
         self._introspector = Introspector
         self._md5 = MD5
         self._sha256 = SHA256
@@ -739,11 +784,6 @@ class DatasetInfo(object):
     @property
     def description(self):
         return self._description
-
-
-    @property
-    def source_id(self):
-        return self._source_id
 
 
     @property
@@ -772,16 +812,8 @@ class DatasetInfo(object):
 
 
     def _validate_info(self):
-        found = self.origin.get_items_from_table("Dataset", [
-                ["DatasetId", "=", self.id],
-                ["Name", "=", self.name],
-                ["Description", "=", self._original_description],
-                ["SourceId", "=", self.sourceid],
-                ["Introspector", "=", self.introspector],
-                ["MD5", "=", self.md5],
-                ["SHA256", "=", self.sha256],
-                ["Created", "=", self.created]
-        ])
+        found = self.origin.get_items_from_table("Dataset",
+            ["MD5", "=", self.md5])
 
         assert len(found) == 1, INVALID_DS_INFO
 
@@ -790,12 +822,10 @@ class DatasetInfo(object):
         return str({"id": self.id,
                     "name": self.name,
                     "description": self.description,
-                    "source_id": self.source_id,
                     "introspector": self.introspector,
                     "md5": self.md5,
                     "sha256": self.sha256,
-                    "created": self.created,
-                    "origin": self.origin})
+                    "created": self.created})
 
 
     def __repr__(self):
@@ -808,14 +838,14 @@ class Dataset(object):
         ds_info: Union[DatasetInfo, None] = None,
         name: Union[str, None] = None,
         description: Union[str, None] = None,
-        introspector: Union[Introspector, None] = None):
+        introspector: Union[Introspector, str, None] = None):
 
         # enforce types
         checks.check_types(dataset, [object, type(None)])
         checks.check_types(ds_info, [DatasetInfo, type(None)])
         checks.check_types(name, [str, type(None)])
         checks.check_types(description, [str, type(None)])
-        checks.check_types(introspector, [Introspector, type(None)])
+        checks.check_types(introspector, [Introspector, str, type(None)])
 
         # must provide dataset or ds_info
         assert dataset is not None or ds_info is not None, MISSING_INIT
@@ -839,6 +869,10 @@ class Dataset(object):
                 self._introspector = introspector
         else:
             self._introspector = self.info.introspector
+
+        # read introspector
+        if isinstance(self.introspector, str):
+            self._introspector = INTROSPECTOR_MAP[self.introspector](dataset)
 
         # update hashes
         self._md5 = tools.get_object_hash(self.ds)
@@ -880,6 +914,10 @@ class Dataset(object):
 
         return self.introspector.obj
 
+    @property
+    def validated(self):
+        return self.introspector.validated
+
 
     @property
     def introspector(self):
@@ -909,15 +947,6 @@ class Dataset(object):
                  "sha256": self.sha256}
 
         return state
-
-
-    def store_files(self, **kwargs):
-        # store files
-        self.introspector.store_files(**kwargs)
-
-        # update hashes
-        self._md5 = tools.get_object_hash(self.ds)
-        self._sha256 = tools.get_object_hash(self.ds, hashlib.sha256)
 
 
     def validate(self, **kwargs):

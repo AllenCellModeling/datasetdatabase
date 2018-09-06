@@ -274,10 +274,3 @@ class DataFrameIntrospector(Introspector):
         package["data"] = self.obj
         package["files"] = None
         return package
-
-
-    def validate_key(self,
-        key: str,
-        func: Union[types.ModuleType, types.FunctionType]) -> bool:
-
-        return func(self.obj[key])

@@ -12,9 +12,6 @@ TABLES = {"User": tables.create_User,
           "Iota": tables.create_Iota,
           "Group": tables.create_Group,
           "IotaGroup": tables.create_IotaGroup,
-          "Source": tables.create_Source,
-          "FileSource": tables.create_FileSource,
-          "QuiltSource": tables.create_QuiltSource,
           "Dataset": tables.create_Dataset,
           "GroupDataset": tables.create_GroupDataset,
           "Annotation": tables.create_Annotation,
@@ -22,7 +19,6 @@ TABLES = {"User": tables.create_User,
           "Algorithm": tables.create_Algorithm,
           "Run": tables.create_Run,
           "RunInput": tables.create_RunInput,
-          "RunOutput": tables.create_RunOutput,
-          "RunSource": tables.create_RunSource}
+          "RunOutput": tables.create_RunOutput}
 
 MINIMAL = SchemaVersion("MINIMAL", TABLES, VERSION)

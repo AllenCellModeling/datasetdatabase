@@ -66,49 +66,6 @@ def create_IotaGroup(schema: orator.Schema):
                  .on("Group")
 
 
-def create_Source(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("Source"):
-        with schema.create("Source") as table:
-            table.increments("SourceId")
-            table.datetime("Created")
-
-
-def create_FileSource(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("FileSource"):
-        with schema.create("FileSource") as table:
-            table.increments("FileSourceId")
-            table.string("FileId")
-            table.integer("SourceId").unsigned()
-            table.datetime("Created")
-            table.foreign("SourceId") \
-                 .references("SourceId") \
-                 .on("Source")
-
-
-def create_QuiltSource(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("QuiltSource"):
-        with schema.create("QuiltSource") as table:
-            table.increments("QuiltSourceId")
-            table.string("PackageString")
-            table.integer("SourceId").unsigned()
-            table.datetime("Created")
-            table.foreign("SourceId") \
-                 .references("SourceId") \
-                 .on("Source")
-
-
 def create_Dataset(schema: orator.Schema):
     # enforce types
     checks.check_types(schema, orator.Schema)
@@ -119,14 +76,10 @@ def create_Dataset(schema: orator.Schema):
             table.increments("DatasetId")
             table.string("Name").unique()
             table.text("Description").nullable()
-            table.integer("SourceId").unsigned()
             table.string("Introspector")
             table.string("MD5")
             table.string("SHA256")
             table.datetime("Created")
-            table.foreign("SourceId") \
-                 .references("SourceId") \
-                 .on("Source")
 
 
 def create_GroupDataset(schema: orator.Schema):
@@ -192,11 +145,9 @@ def create_Algorithm(schema: orator.Schema):
     if not schema.has_table("Algorithm"):
         with schema.create("Algorithm") as table:
             table.increments("AlgorithmId")
-            table.string("FileId")
             table.string("Name")
             table.string("Description").nullable()
             table.string("Version")
-            table.string("MD5")
             table.datetime("Created")
             table.unique(["Name", "Version"])
 
@@ -263,22 +214,3 @@ def create_RunOutput(schema: orator.Schema):
             table.foreign("DatasetId") \
                  .references("DatasetId") \
                  .on("Dataset")
-
-
-def create_RunSource(schema: orator.Schema):
-    # enforce types
-    checks.check_types(schema, orator.Schema)
-
-    # create table
-    if not schema.has_table("RunSource"):
-        with schema.create("RunSource") as table:
-            table.increments("RunSourceId")
-            table.integer("SourceId").unsigned()
-            table.integer("RunId").unsigned()
-            table.datetime("Created")
-            table.foreign("SourceId") \
-                 .references("SourceId") \
-                 .on("Source")
-            table.foreign("RunId") \
-                 .references("RunId") \
-                 .on("Run")
