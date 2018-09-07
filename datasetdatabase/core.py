@@ -1039,7 +1039,7 @@ class Dataset(object):
 
     def apply(self,
         algorithm: Union[types.MethodType, types.FunctionType],
-        database: DatasetDatabase,
+        database: Union[DatasetDatabase, None] = None,
         algorithm_name: Union[str, None] = None,
         algorithm_description: Union[str, None] = None,
         algorithm_version: Union[str, None] = None,
@@ -1051,7 +1051,7 @@ class Dataset(object):
 
         # enforce types
         checks.check_types(algorithm, [types.MethodType, types.FunctionType])
-        checks.check_types(database, DatasetDatabase)
+        checks.check_types(database, [DatasetDatabase, type(None)])
         checks.check_types(algorithm_name, [str, type(None)])
         checks.check_types(algorithm_description, [str, type(None)])
         checks.check_types(algorithm_version, [str, type(None)])
@@ -1060,6 +1060,13 @@ class Dataset(object):
         checks.check_types(algorithm_parameters, dict)
         checks.check_types(output_dataset_name, [str, type(None)])
         checks.check_types(output_dataset_description, [str, type(None)])
+
+        # database already in info
+        if database is None:
+            if self.info is None:
+                raise KeyError(MISSING_PARAMETER.format(p="database"))
+            else:
+                database = self.info.origin
 
         # ensure dataset is in database
         found_ds = database.get_items_from_table(
@@ -1085,6 +1092,10 @@ class Dataset(object):
             algorithm_parameters=algorithm_parameters,
             output_dataset_name=output_dataset_name,
             output_dataset_description=output_dataset_description)
+
+
+    def history(self, database):
+        return
 
 
     def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:
