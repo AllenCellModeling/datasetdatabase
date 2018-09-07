@@ -4,6 +4,7 @@
 from pandas import read_csv as pd_read_csv
 from typing import Union, Dict, List
 from datetime import datetime
+import subprocess
 import importlib
 import inspect
 import pathlib
@@ -12,6 +13,7 @@ import orator
 import pickle
 import types
 import json
+import os
 
 # self
 from .introspect import ObjectIntrospector
@@ -35,7 +37,7 @@ DATETIME_PARSE = "%Y-%m-%d %H:%M:%S.%f"
 
 MISSING_PARAMETER = "Must provide at least one of the following parameters: {p}"
 VERSION_LOOKUP = ["__version__", "__VERSION__", "VERSION", "version"]
-UNKNOWN_DATASET_HASH = "Changed dataset hash.\n\tOriginal: {o}\n\tCurrent: {c}"
+UNKNOWN_DATASET_HASH = "Dataset hash changed.\n\tOriginal: {o}\n\tCurrent: {c}"
 
 GENERIC_TYPES = Union[bytes, str, int, float, None, datetime]
 MISSING_INIT = "Must provide either an object or a DatasetInfo object."
@@ -414,7 +416,7 @@ class DatasetDatabase(object):
         run_description: Union[str, None] = None,
         algorithm_parameters: dict = {},
         output_dataset_name: Union[str, None] = None,
-        output_dataset_description: Union[str, None] = None) -> "DatasetInfo":
+        output_dataset_description: Union[str, None] = None) -> "Dataset":
 
         # enforce types
         checks.check_types(algorithm, [types.MethodType, types.FunctionType])
@@ -807,7 +809,7 @@ class DatasetDatabase(object):
 class DatasetInfo(object):
     def __init__(self,
         DatasetId: int,
-        Name: str,
+        Name: Union[str, None],
         Introspector: str,
         MD5: str,
         SHA256: str,
@@ -817,7 +819,7 @@ class DatasetInfo(object):
 
         # enforce types
         checks.check_types(DatasetId, int)
-        checks.check_types(Name, str)
+        checks.check_types(Name, [str, type(None)])
         checks.check_types(Description, [str, type(None)])
         checks.check_types(Introspector, str)
         checks.check_types(MD5, str)
@@ -825,11 +827,7 @@ class DatasetInfo(object):
         checks.check_types(Created, [datetime, str])
         checks.check_types(OriginDb, DatasetDatabase)
 
-        self._original_description = Description
-
         # convert types
-        if Description is None:
-            Description = ""
         if isinstance(Created, str):
             Created = datetime.strptime(Created, DATETIME_PARSE)
 
@@ -957,8 +955,6 @@ class Dataset(object):
         # unpack based on info
         # name
         if self.info is None:
-            if name is None:
-                name = self.md5
             self.name = name
         else:
             self.name = self.info.name
@@ -1042,14 +1038,53 @@ class Dataset(object):
 
 
     def apply(self,
-        function: Union[types.ModuleType, types.FunctionType]):
+        algorithm: Union[types.MethodType, types.FunctionType],
+        database: DatasetDatabase,
+        algorithm_name: Union[str, None] = None,
+        algorithm_description: Union[str, None] = None,
+        algorithm_version: Union[str, None] = None,
+        run_name: Union[str, None] = None,
+        run_description: Union[str, None] = None,
+        algorithm_parameters: dict = {},
+        output_dataset_name: Union[str, None] = None,
+        output_dataset_description: Union[str, None] = None) -> "Dataset":
 
-        # TODO:
-        # roundtrip if no ds info attached
-        # process
-        # new dataset
+        # enforce types
+        checks.check_types(algorithm, [types.MethodType, types.FunctionType])
+        checks.check_types(database, DatasetDatabase)
+        checks.check_types(algorithm_name, [str, type(None)])
+        checks.check_types(algorithm_description, [str, type(None)])
+        checks.check_types(algorithm_version, [str, type(None)])
+        checks.check_types(run_name, [str, type(None)])
+        checks.check_types(run_description, [str, type(None)])
+        checks.check_types(algorithm_parameters, dict)
+        checks.check_types(output_dataset_name, [str, type(None)])
+        checks.check_types(output_dataset_description, [str, type(None)])
 
-        return
+        # ensure dataset is in database
+        found_ds = database.get_items_from_table(
+            "Dataset", ["MD5", "=", self.md5])
+
+        # not found
+        if len(found_ds) == 0:
+            self = database.upload_dataset(self)
+
+        # database structure error
+        elif len(found_ds) >= 2:
+            raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+
+        # apply to self
+        return database.process(
+            algorithm=algorithm,
+            input_dataset=self,
+            algorithm_name=algorithm_name,
+            algorithm_description=algorithm_description,
+            algorithm_version=algorithm_version,
+            run_name=run_name,
+            run_description=run_description,
+            algorithm_parameters=algorithm_parameters,
+            output_dataset_name=output_dataset_name,
+            output_dataset_description=output_dataset_description)
 
 
     def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:

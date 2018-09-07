@@ -74,7 +74,7 @@ def create_Dataset(schema: orator.Schema):
     if not schema.has_table("Dataset"):
         with schema.create("Dataset") as table:
             table.increments("DatasetId")
-            table.string("Name").unique()
+            table.string("Name").unique().nullable()
             table.text("Description").nullable()
             table.string("Introspector")
             table.string("MD5").unique()
