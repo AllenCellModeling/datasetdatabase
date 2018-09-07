@@ -5,6 +5,7 @@ from typing import Dict, List, Union
 from datetime import datetime
 import pickle
 import types
+import uuid
 
 # self
 from .introspector import Introspector
@@ -59,17 +60,12 @@ class ObjectIntrospector(Introspector):
         storage["Iota"] = [{"Key": "obj",
                             "Value": pickle.dumps(self.obj),
                             "Created": created}]
-        storage["Group"] = [{"Label": 0,
+        storage["Group"] = [{"Label": str(uuid.uuid4()),
                              "Created": created}]
         storage["IotaGroup"] = [{"IotaId": 0,
                                  "GroupId": 0,
                                  "Created": created}]
         return storage
-
-
-    def reconstruct(self, items: Dict[str, Dict[str, object]]) -> object:
-        self._obj = pickle.loads(items["Iota"][0]["Value"])
-        return self.obj
 
 
     def package(self):
@@ -84,3 +80,8 @@ class ObjectIntrospector(Introspector):
         func: Union[types.ModuleType, types.FunctionType]) -> bool:
 
         return func(getattr(self.obj, item))
+
+
+def reconstruct(items: Dict[str, Dict[str, object]]) -> object:
+    obj = pickle.loads(items["Iota"][0]["Value"])
+    return obj

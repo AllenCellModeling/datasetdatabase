@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import pickle
 import types
+import uuid
 
 # self
 from ..utils import checks, tools, ProgressBar
@@ -211,7 +212,7 @@ class DataFrameIntrospector(Introspector):
     def _create_Group(self, row, storage):
         # create group
         created = datetime.now()
-        group = {"Label": row.name,
+        group = {"Label": str(uuid.uuid4()),
                  "Created": created}
 
         # add group
@@ -254,19 +255,8 @@ class DataFrameIntrospector(Introspector):
                             increment = len(self.obj.columns))
         self.obj.apply(lambda row: bar.apply_and_update(self._create_Group,
                     row=row, storage=storage), axis=1)
+
         return storage
-
-
-    def reconstruct(self, items: Dict[str, Dict[str, object]]) -> object:
-        rows = [{} for i in range(len(items["Group"]))]
-        for iota_group in items["IotaGroup"]:
-            iota = items["Iota"][iota_group["IotaId"]]
-            group = items["Group"][iota_group["GroupId"]]
-            rows[group["Label"]] = {**rows[group["Label"]],
-                                **{iota["Key"]: pickle.loads(iota["Value"])}}
-
-        self._obj = pd.DataFrame(rows)
-        return self.obj
 
 
     def package(self):
@@ -274,3 +264,23 @@ class DataFrameIntrospector(Introspector):
         package["data"] = self.obj
         package["files"] = None
         return package
+
+
+def reconstruct(items: Dict[str, Dict[str, object]]) -> pd.DataFrame:
+    rows = {}
+    for iota_group in items["IotaGroup"]:
+        for i, iota in enumerate(items["Iota"]):
+            if iota["IotaId"] == iota_group["IotaId"]:
+                break
+        for i, group in enumerate(items["Group"]):
+            if group["GroupId"] == iota_group["GroupId"]:
+                break
+
+        try:
+            rows[group["Label"]] = {**rows[group["Label"]],
+                **{iota["Key"]: pickle.loads(iota["Value"])}}
+        except KeyError:
+            rows[group["Label"]] = {
+                **{iota["Key"]: pickle.loads(iota["Value"])}}
+
+    return pd.DataFrame(list(rows.values()))

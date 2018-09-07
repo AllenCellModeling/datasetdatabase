@@ -59,15 +59,6 @@ class Introspector(abc.ABC):
 
 
     @abc.abstractmethod
-    def reconstruct(self, items: Dict[str, Dict[str, object]]) -> object:
-        """
-        Given dictionary of lists of Iota, Group, and IotaGroup objects,
-        reconstruct to the base object.
-        """
-        return self.obj
-
-
-    @abc.abstractmethod
     def package(self, items: Dict[str, Dict[str, object]]) -> Dict[str, object]:
         """
         Because these are incredibly arbitrary objects, there is not default
@@ -80,3 +71,13 @@ class Introspector(abc.ABC):
         package["data"] = self.obj
         package["files"] = None
         return package
+
+
+@abc.abstractmethod
+def reconstruct(items: Dict[str, Dict[str, object]]) -> object:
+    """
+    Given dictionary of lists of Iota, Group, and IotaGroup objects,
+    reconstruct to the base object.
+    """
+    obj = {}
+    return obj

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 # installed
+from pandas import read_csv as pd_read_csv
 from typing import Union, Dict, List
 from datetime import datetime
-import pandas as pd
 import importlib
 import inspect
 import pathlib
@@ -14,7 +14,11 @@ import types
 import json
 
 # self
-from .introspect import Introspector, INTROSPECTOR_MAP, ObjectIntrospector
+from .introspect import ObjectIntrospector
+from .introspect import RECONSTRUCTOR_MAP
+from .introspect import INTROSPECTOR_MAP
+from .introspect import Introspector
+
 from .schema import FMSInterface
 from .schema import SchemaVersion
 from .utils import checks, tools
@@ -25,23 +29,20 @@ from .version import VERSION
 REQUIRED_CONFIG_ITEMS = ("driver", "database")
 MISSING_REQUIRED_ITEMS = "Config must have {i}.".format(i=REQUIRED_CONFIG_ITEMS)
 MALFORMED_LOCAL_LINK = "Local databases must have suffix '.db'"
-TOO_MANY_CONFIGS = "Config must be only for a single database link."
 
-FILEPATH_COL_SEP = ","
 INVALID_DS_INFO = "This set of attributes could not be found in the linked db."
+DATETIME_PARSE = "%Y-%m-%d %H:%M:%S.%f"
 
 MISSING_PARAMETER = "Must provide at least one of the following parameters: {p}"
 VERSION_LOOKUP = ["__version__", "__VERSION__", "VERSION", "version"]
-UNKNOWN_DATASET_HASH = "The dataset hash has changed since it was validated."
+UNKNOWN_DATASET_HASH = "Changed dataset hash.\n\tOriginal: {o}\n\tCurrent: {c}"
 
-UNIX_REPLACE = {"\\": "/"}
 GENERIC_TYPES = Union[bytes, str, int, float, None, datetime]
-DATASET_EXTENSION = ".dataset"
 MISSING_INIT = "Must provide either an object or a DatasetInfo object."
-EDITING_STORED_DATASET = "Datasets connected to DatasetInfo are immutable."
 TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
+DATASET_NOT_FOUND = "Dataset not found using keyword arguments:\n\t{kw}"
 
-EXTENSION_MAP = {".csv": pd.read_csv,
+EXTENSION_MAP = {".csv": pd_read_csv,
                  ".dataset": tools.read_pickle}
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
@@ -444,7 +445,9 @@ class DatasetDatabase(object):
 
             # found
             if len(found_ds) == 1:
-                input_dataset._info = DatasetInfo(found_ds[0])
+                ds_info = found_ds[0]
+                ds_info["OriginDb"] = self
+                input_dataset._info = DatasetInfo(**ds_info)
                 input = input_dataset
 
             # not found
@@ -531,7 +534,7 @@ class DatasetDatabase(object):
         if len(found_ds) == 1:
             ds_info = found_ds[0]
             ds_info["OriginDb"] = self
-            return DatasetInfo(**ds_info)
+            ds_info = DatasetInfo(**ds_info)
 
         # not found
         elif len(found_ds) == 0:
@@ -601,13 +604,13 @@ class DatasetDatabase(object):
 
 
     def upload_dataset(self, dataset: "Dataset", **kwargs) -> "DatasetInfo":
-
         # enforce types
         checks.check_types(dataset, Dataset)
 
         # enforce no change
         current_hash = tools.get_object_hash(dataset.ds)
-        assert current_hash == dataset.md5, UNKNOWN_DATASET_HASH
+        assert current_hash == dataset.md5, UNKNOWN_DATASET_HASH.format(
+            o=dataset.md5, c=current_hash)
 
         create_params = {}
         create_params["algorithm"] = self._upload_dataset
@@ -621,8 +624,81 @@ class DatasetDatabase(object):
         return self.process(**create_params)
 
 
-    def get_dataset(self, id=0) -> "Dataset":
-        return pd.DataFrame()
+    def get_dataset(self,
+        id: Union[int, None] = None,
+        name: Union[str, None] = None,
+        md5: Union[str, None] = None,
+        sha256: Union[str, None] = None) -> "Dataset":
+
+        # enforce types
+        checks.check_types(id, [int, type(None)])
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(md5, [str, type(None)])
+        checks.check_types(sha256, [str, type(None)])
+
+        # must pass parameter
+        assert any(i is not None for i in [id, name, md5, sha256]), \
+            MISSING_PARAMETER.format(p=[id, name, md5, sha256])
+
+        # get ds_info
+        if id is not None:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["DatasetId", "=", id])
+        elif name is not None:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["Name", "=", name])
+        elif md5 is not None:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["MD5", "=", md5])
+        else:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["SHA256", "=", sha256])
+
+        # found
+        if len(found_ds) == 1:
+            ds_info = found_ds[0]
+            ds_info["OriginDb"] = self
+            ds_info = DatasetInfo(**ds_info)
+
+        # not found
+        elif len(found_ds) == 0:
+            raise ValueError(DATASET_NOT_FOUND.format(kw=locals()))
+
+        # database structure error
+        else:
+            raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+
+        # create items map
+        items = {}
+
+        # get group dataset joins
+        group_dataset = self.get_items_from_table(
+            "GroupDataset", ["DatasetId", "=", ds_info.id])
+
+        # get groups
+        group = []
+        for gd in group_dataset:
+            group += self.get_items_from_table(
+                "Group", ["GroupId", "=", gd["GroupId"]])
+        items["Group"] = group
+
+        # get iota group joins
+        iota_group = []
+        for g in group:
+            iota_group += self.get_items_from_table(
+                "IotaGroup", ["GroupId", "=", g["GroupId"]])
+        items["IotaGroup"] = iota_group
+
+        # get iota
+        iota = []
+        for ig in iota_group:
+            iota += self.get_items_from_table(
+                "Iota", ["IotaId", "=", ig["IotaId"]])
+        items["Iota"] = iota
+
+        obj = RECONSTRUCTOR_MAP[ds_info.introspector](items)
+
+        return Dataset(dataset=obj, ds_info=ds_info)
 
 
     def get_items_from_table(self,
@@ -755,7 +831,7 @@ class DatasetInfo(object):
         if Description is None:
             Description = ""
         if isinstance(Created, str):
-            Created = datetime.strptime(Created)
+            Created = datetime.strptime(Created, DATETIME_PARSE)
 
         # set attributes
         self._id = DatasetId
@@ -916,7 +992,10 @@ class Dataset(object):
 
     @property
     def validated(self):
-        return self.introspector.validated
+        if self.info is None:
+            return self.introspector.validated
+
+        return True
 
 
     @property
@@ -959,7 +1038,7 @@ class Dataset(object):
         checks.check_types(database, DatasetDatabase)
 
         # run upload
-        self._info = database.upload_dataset(self)
+        self = database.upload_dataset(self)
 
 
     def apply(self,

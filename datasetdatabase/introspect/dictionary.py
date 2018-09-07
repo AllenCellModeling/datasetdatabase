@@ -5,6 +5,7 @@ from typing import Dict, List, Union
 from datetime import datetime
 import pickle
 import types
+import uuid
 
 # self
 from ..utils import checks, ProgressBar
@@ -17,7 +18,7 @@ class DictionaryIntrospector(Introspector):
     Iota, etc.
     """
 
-    def __init__(self, obj: object):
+    def __init__(self, obj: dict):
         self._obj = obj
         self._validated = {k: False for k in self.obj}
 
@@ -56,19 +57,13 @@ class DictionaryIntrospector(Introspector):
                             "Value": pickle.dumps(v),
                             "Created": created}
                             for k, v in self.obj.items()]
-        storage["Group"] = [{"Label": 0,
+        storage["Group"] = [{"Label": str(uuid.uuid4()),
                              "Created": created}]
         storage["IotaGroup"] = [{"IotaId": i,
                                  "GroupId": 0,
                                  "Created": created}
                                  for i in range(len(storage["Iota"]))]
         return storage
-
-
-    def reconstruct(self, items: Dict[str, Dict[str, object]]) -> object:
-        self._obj = {i["Key"]: pickle.loads(i["Value"])
-                        for i in items["Iota"]}
-        return self.obj
 
 
     def package(self):
@@ -83,3 +78,9 @@ class DictionaryIntrospector(Introspector):
         func: Union[types.ModuleType, types.FunctionType]) -> bool:
 
         return func(self.obj[key])
+
+
+def reconstruct(items: Dict[str, Dict[str, object]]) -> dict:
+    obj = {i["Key"]: pickle.loads(i["Value"])
+                    for i in items["Iota"]}
+    return obj
