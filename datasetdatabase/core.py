@@ -33,6 +33,7 @@ MISSING_REQUIRED_ITEMS = "Config must have {i}.".format(i=REQUIRED_CONFIG_ITEMS)
 MALFORMED_LOCAL_LINK = "Local databases must have suffix '.db'"
 
 INVALID_DS_INFO = "This set of attributes could not be found in the linked db."
+NO_DS_INFO = "There is no dataset info attached to this dataset object."
 DATETIME_PARSE = "%Y-%m-%d %H:%M:%S.%f"
 
 MISSING_PARAMETER = "Must provide at least one of the following parameters: {p}"
@@ -538,6 +539,8 @@ class DatasetDatabase(object):
             ds_info["OriginDb"] = self
             ds_info = DatasetInfo(**ds_info)
 
+            return Dataset(dataset=dataset.ds, ds_info=ds_info)
+
         # not found
         elif len(found_ds) == 0:
             introspector_module = str(type(dataset.introspector))
@@ -965,6 +968,18 @@ class Dataset(object):
         else:
             self.description = self.info.description
 
+        # annotations
+        if self.info is None:
+            self._annotations = []
+        else:
+            annotation_dataset = self.info.origin.get_items_from_table(
+                "AnnotationDataset", ["DatasetId", "=", self.info.id])
+            annotations = []
+            for ad in annotation_dataset:
+                annotations += self.info.origin.get_items_from_table(
+                    "Annotation", ["AnnotationId", "=", ad["AnnotationId"]])
+            self._annotations = annotations
+
         # created
         if self.info is None:
             self.created = datetime.now()
@@ -985,6 +1000,7 @@ class Dataset(object):
             self._introspector._obj = ds
 
         return self.introspector.obj
+
 
     @property
     def validated(self):
@@ -1010,6 +1026,11 @@ class Dataset(object):
 
 
     @property
+    def annotations(self):
+        return self._annotations
+
+
+    @property
     def state(self):
         ds_ready = self.ds is not None
         state = {"info": self.info,
@@ -1017,9 +1038,10 @@ class Dataset(object):
                  "name": self.name,
                  "description": self.description,
                  "introspector": type(self.introspector),
-                 "validated": self.introspector.validated,
+                 "validated": self.validated,
                  "md5": self.md5,
-                 "sha256": self.sha256}
+                 "sha256": self.sha256,
+                 "annotations": self.annotations}
 
         return state
 
@@ -1034,7 +1056,10 @@ class Dataset(object):
         checks.check_types(database, DatasetDatabase)
 
         # run upload
-        self = database.upload_dataset(self)
+        ds = database.upload_dataset(self)
+
+        # reassign self
+        self._reassign_self(ds)
 
 
     def apply(self,
@@ -1074,14 +1099,15 @@ class Dataset(object):
 
         # not found
         if len(found_ds) == 0:
-            self = database.upload_dataset(self)
+            ds = database.upload_dataset(self)
+            self._reassign_self(ds)
 
         # database structure error
         elif len(found_ds) >= 2:
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
         # apply to self
-        return database.process(
+        ds = database.process(
             algorithm=algorithm,
             input_dataset=self,
             algorithm_name=algorithm_name,
@@ -1093,9 +1119,54 @@ class Dataset(object):
             output_dataset_name=output_dataset_name,
             output_dataset_description=output_dataset_description)
 
+        # reassign self
+        self._reassign_self(ds)
 
-    def history(self, database):
-        return
+
+    def _reassign_self(self, ds: "Dataset"):
+        # enforce types
+        checks.check_types(ds, Dataset)
+
+        # reassign self
+        self._info = ds._info
+        self._introspector = ds._introspector
+        self.name = ds.name
+        self.description = ds.description
+        self._annotations = ds._annotations
+        self._md5 = ds._md5
+        self._sha256 = ds._sha256
+
+
+    @property
+    def graph(self):
+        if self.info is not None:
+            self.info.origin.display_dataset_graph(self.info.id)
+        else:
+            return NO_DS_INFO
+
+
+    @property
+    def connections(self):
+        if self.info is not None:
+            return self.info.origin.get_dataset_connections(self.info.id)
+        else:
+            return NO_DS_INFO
+
+
+    def add_annotation(self, annotation: str):
+        # enforce types
+        checks.check_types(annotation, str)
+
+        self._annotations += {"Value": annotation, "Created": datetime.now()}
+
+
+    def _update_annotations(self, database: DatasetDatabase):
+        # enforce types
+        checks.check_types(database, DatasetDatabase)
+
+        for annotation in self.annotations:
+            if "AnnotationId" not in annotation:
+                return
 
 
     def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:
