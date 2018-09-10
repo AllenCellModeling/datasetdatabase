@@ -4,11 +4,13 @@
 from typing import Dict, List, Union
 from datetime import datetime
 import pandas as pd
+import orator
 import pickle
 import types
 import uuid
 
 # self
+from ..schema.filemanagers import FMSInterface
 from ..utils import checks, tools, ProgressBar
 from .introspector import Introspector
 
@@ -20,11 +22,15 @@ class DataFrameIntrospector(Introspector):
     """
 
     def __init__(self, obj: pd.DataFrame):
+        # enforce types
+        checks.check_types(obj, pd.DataFrame)
+
         self._obj = obj
         self._validated = {"types": {k: False for k in self.obj.columns},
                            "values": {k: False for k in self.obj.columns},
                            "files": False}
         self.filepath_columns = None
+
 
     @property
     def obj(self):
@@ -151,33 +157,6 @@ class DataFrameIntrospector(Introspector):
         if isinstance(filepath_columns, str):
             filepath_columns = [filepath_columns]
 
-        # get columns
-        if filepath_columns is None:
-            if self.filepath_columns is not None:
-                filepath_columns = self.filepath_columns
-        # update filepath columns
-        else:
-            if self.filepath_columns is None:
-                self.filepath_columns = filepath_columns
-            else:
-                self.filepath_columns += list(set(filepath_columns) -
-                                              set(self.filepath_columns))
-
-        # run exists
-        if self.filepath_columns is not None:
-            print("Checking files exist...")
-            self._validate_dataset_files()
-
-        # update validated
-        self._validated["files"] = {k: True for k in self.filepath_columns}
-
-
-    def store_files(self,
-        filepath_columns: Union[str, List[str], None] = None):
-
-        # enforce types
-        checks.check_types(filepath_columns, [str, list, type(None)])
-
         # update filepath columns
         if self.filepath_columns is None:
             self.filepath_columns = filepath_columns
@@ -185,10 +164,43 @@ class DataFrameIntrospector(Introspector):
             self.filepath_columns += list(set(filepath_columns) -
                                           set(self.filepath_columns))
 
-        self.enforce_files_exist_from_columns()
+        # run exists
+        if self.filepath_columns is not None:
+            print("Checking files exist...")
+            self._validate_dataset_files()
 
-        # schedule file conversion
-        print("file storage not implemented yet... :/")
+            # update validated
+            self._validated["files"] = {k: True for k in self.filepath_columns}
+
+        # no columns passed
+        else:
+            self._validated["files"] = False
+
+
+    def store_files(self,
+        dataset: "Dataset",
+        db: orator.DatabaseManager,
+        fms: FMSInterface,
+        filepath_columns: Union[str, List[str], None] = None):
+
+        # enforce types
+        checks.check_types(db, orator.DatabaseManager)
+        checks.check_types(fms, FMSInterface)
+        checks.check_types(filepath_columns, [str, list, type(None)])
+
+        # enforce exists
+        self.enforce_files_exist_from_columns(filepath_columns)
+
+        # update filepaths to storage files
+        if self.filepath_columns is not None:
+            print("Creating FMS stored files...")
+            bar = ProgressBar(len(self.obj) * len(self.filepath_columns))
+            for key in self.filepath_columns:
+                self.obj[key] = self.obj[key].apply(
+                    lambda x: bar.apply_and_update(
+                        fms.get_or_create_file, db=db, filepath=x)["ReadPath"])
+
+        return self.obj
 
 
     def validate(self,
@@ -253,6 +265,7 @@ class DataFrameIntrospector(Introspector):
 
         bar = ProgressBar(len(self.obj) * len(self.obj.columns),
                             increment = len(self.obj.columns))
+        print("Tearing down object...")
         self.obj.apply(lambda row: bar.apply_and_update(self._create_Group,
                     row=row, storage=storage), axis=1)
 

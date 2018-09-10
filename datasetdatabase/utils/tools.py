@@ -82,9 +82,19 @@ def get_file_hash(path: Union[str, pathlib.Path],
     # convert types
     path = pathlib.Path(path)
 
-    # get hash
+    # block size
+    BLOCKSIZE = 65536
+
+    # block read
+    alg = alg()
     with open(path, "rb") as read_in:
-        return get_object_hash(read_in, alg)
+        file_buffer = read_in.read(BLOCKSIZE)
+        while len(file_buffer) > 0:
+            alg.update(file_buffer)
+            file_buffer = read_in.read(BLOCKSIZE)
+
+    # get hash
+    return alg.hexdigest()
 
 
 def get_object_hash(obj: object,

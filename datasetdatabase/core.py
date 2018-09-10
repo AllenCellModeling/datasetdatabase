@@ -13,6 +13,7 @@ import orator
 import pickle
 import types
 import json
+import uuid
 import os
 
 # self
@@ -344,8 +345,12 @@ class DatasetDatabase(object):
             name = str(algorithm)
             method = "<bound method "
             function = "<function "
-            end = " at "
-            end_index = name.index(end)
+            end_at = " at "
+            end_of = " of "
+            try:
+                end_index = name.index(end_at)
+            except ValueError:
+                end_index = name.index(end_of)
             if method in name:
                 name = name[len(method): end_index]
             else:
@@ -474,23 +479,37 @@ class DatasetDatabase(object):
                                                 algorithm_description,
                                                 algorithm_version)
 
+        # check parameters for dsdb parameters
+        if algorithm_name == "dsdb.Dataset.store_files":
+            db = algorithm_parameters.pop("db", None)
+            fms = algorithm_parameters.pop("fms", None)
+
+            alg_params_ds = self._create_dataset(algorithm_parameters,
+                description="algorithm parameters")
+
+            algorithm_parameters["db"] = db
+            algorithm_parameters["fms"] = fms
+
         # store params used
-        alg_params_ds = self._create_dataset(algorithm_parameters,
-            description="algorithm parameters")
+        else:
+            alg_params_ds = self._create_dataset(algorithm_parameters,
+                description="algorithm parameters")
 
         # begin
+        print("Dataset processing has begun...")
         begin = datetime.now()
 
         # run
         output = algorithm(input, **algorithm_parameters)
 
-        # ingest output
-        output = self._create_dataset(output,
-                             name=output_dataset_name,
-                             description=output_dataset_description)
-
         # end
         end = datetime.now()
+        print("Dataset processing has ended...")
+
+        # ingest output
+        output = self._create_dataset(output,
+             name=output_dataset_name,
+             description=output_dataset_description)
 
         # update run table
         run_info = self._insert_to_table("Run",
@@ -957,6 +976,8 @@ class Dataset(object):
 
         # unpack based on info
         # name
+        if name is None:
+            name = str(uuid.uuid4())
         if self.info is None:
             self.name = name
         else:
@@ -1049,6 +1070,36 @@ class Dataset(object):
     def validate(self, **kwargs):
         # validate obj
         self.introspector.validate(**kwargs)
+
+
+    def store_files(self,
+        db: Union[orator.DatabaseManager, None] = None,
+        fms: Union[FMSInterface, None] = None, **kwargs):
+        # enforce types
+        checks.check_types(db, [orator.DatabaseManager, type(None)])
+        checks.check_types(fms, [FMSInterface, type(None)])
+
+        # route db
+        if db is None:
+            if self.info is None:
+                raise ValueError(MISSING_PARAMETER.format(p="ds"))
+            else:
+                db = self.info.origin.constructor.db
+
+        # route fms
+        if fms is None:
+            if self.info is None:
+                raise ValueError(MISSING_PARAMETER.format(p="fms"))
+            else:
+                fms = self.info.origin.constructor.fms
+
+        # update dataset
+        if self.info is not None:
+            self.apply(self.introspector.store_files,
+            algorithm_name = "dsdb.Dataset.store_files",
+            output_dataset_name = self.name + " with fms stored files",
+            output_dataset_description = self.description,
+            algorithm_parameters = {"db": db, "fms": fms, **kwargs})
 
 
     def upload_to(self, database: DatasetDatabase) -> DatasetInfo:
@@ -1201,6 +1252,10 @@ class Dataset(object):
             state_str += "\n"
 
         return state_str
+
+
+def _return_dataset_obj(dataset):
+    return dataset.ds
 
 
 def read_dataset(path: Union[str, pathlib.Path]):

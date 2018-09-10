@@ -10,6 +10,7 @@ import orator
 import quilt
 import yaml
 import json
+import uuid
 import os
 
 # self
@@ -23,23 +24,22 @@ CONNECTION_OPTIONS = {"user": STORAGE_USER, "storage_location": None}
 
 
 class QuiltFMS(FMSInterface):
-
     def __init__(self,
-                 connection_options: Union[dict, None] = None):
+        connection_options: Union[dict, None] = None):
 
         # enforce types
         checks.check_types(connection_options, [dict, type(None)])
 
         # set or merge defaults with provided
-        # if connection_options is None:
-        #     self._connection_options = CONNECTION_OPTIONS
-        # else:
-        #     self._connection_options = {**CONNECTION_OPTIONS,
-        #                                **connection_options}
-        #
-        # # update storage user
-        # self.storage_user = self.connection_options["user"]
-        # self.set_storage_location(self.connection_options["storage_location"])
+        if connection_options is None:
+            self._connection_options = CONNECTION_OPTIONS
+        else:
+            self._connection_options = {**CONNECTION_OPTIONS,
+                                       **connection_options}
+
+        # update storage user
+        self.storage_user = self._connection_options["user"]
+        self.set_storage_location(self._connection_options["storage_location"])
 
 
     @property
@@ -55,34 +55,17 @@ class QuiltFMS(FMSInterface):
         if not schema.has_table("File"):
             with schema.create("File") as table:
                 table.string("FileId")
-                table.string("Filename")
                 table.string("OriginalFilepath")
                 table.string("FileType").nullable()
                 table.string("ReadPath")
                 table.string("MD5").unique()
                 table.string("SHA256").unique()
-                table.string("QuiltPackage").unique()
                 table.string("Metadata").nullable()
                 table.datetime("Created")
 
-        # update FileSource and Algorithm relationships
-        try:
-            with schema.table("FileSource") as table:
-                table.foreign("FileId") \
-                     .references("FileId") \
-                     .on("File")
-
-            with schema.table("Algorithm") as table:
-                table.foreign("FileId") \
-                     .references("FileId") \
-                     .on("File")
-            
-        except orator.exceptions.query.QueryException:
-            pass
-
 
     def set_storage_location(self,
-                             storage_location: Union[str, pathlib.Path, None]):
+        storage_location: Union[str, pathlib.Path, None]):
         # enforce types
         checks.check_types(storage_location,
                            [str, pathlib.Path, type(None)])
@@ -95,46 +78,39 @@ class QuiltFMS(FMSInterface):
             os.environ["QUILT_PACKAGE_DIRS"] = str(self.storage_location)
 
 
-    def get_hash(self, filepath: Union[str, pathlib.Path]) -> str:
-        # enforce types
-        checks.check_types(filepath, [str, pathlib.Path])
-        checks.check_file_exists(filepath)
-
-        # construct package_name
-        hash = _hash_bytestr_iter(_file_as_blockiter(open(filepath, "rb")),
-                                  hashlib.md5(),
-                                  True)
-        return hash
-
-
     def get_file(self,
-                   filepath: Union[str, pathlib.Path, None] = None,
-                   readpath: Union[str, pathlib.Path, None] = None,
-                   hash: Union[str, None] = None) -> Union[str, None]:
+        db: orator.DatabaseManager,
+        filepath: Union[str, pathlib.Path, None] = None,
+        readpath: Union[str, pathlib.Path, None] = None,
+        md5: Union[str, None] = None,
+        sha256: Union[str, None] = None) -> Union[str, None]:
         # enforce types
+        checks.check_types(db, orator.DatabaseManager)
         checks.check_types(filepath, [str, pathlib.Path, type(None)])
         checks.check_types(readpath, [str, pathlib.Path, type(None)])
-        checks.check_types(hash, [str, type(None)])
+        checks.check_types(md5, [str, type(None)])
+        checks.check_types(sha256, [str, type(None)])
 
         # enforce at least one parameter given
         assert filepath is not None or \
                readpath is not None or \
-               hash is not None, \
+               md5 is not None or \
+               sha256 is not None, \
             "Provide filepath, an fms provided readpath, or a file hash."
 
         # try to find the fileid
-        if hash is not None:
-            found = self.dsdb.get_items_from_table("File",
-                                                ["MD5", "=", hash])
+        if md5 is not None:
+            table = db.table("File").where("MD5", "=", md5).get()
+        elif sha256 is not None:
+            table = db.table("File").where("SHA256", "=", sha256).get()
         elif readpath is not None:
-            found = self.dsdb.get_items_from_table("File",
-                                                ["ReadPath", "=", readpath])
+            table = db.table("File").where("ReadPath", "=", readpath).get()
         else:
-            hash = self.get_hash(filepath)
-            found = self.dsdb.get_items_from_table("File",
-                                                ["MD5", "=", hash])
+            md5 = tools.get_file_hash(filepath)
+            table = db.table("File").where("MD5", "=", md5).get()
 
         # try catch exists
+        found = [dict(item) for item in table]
         try:
             found = found[0]
         except IndexError:
@@ -144,9 +120,11 @@ class QuiltFMS(FMSInterface):
 
 
     def get_or_create_file(self,
-                           filepath: Union[str, pathlib.Path],
-                           metadata: Union[str, dict, None] = None) -> str:
+        db: orator.DatabaseManager,
+        filepath: Union[str, pathlib.Path],
+        metadata: Union[str, dict, None] = None) -> str:
         # enforce types
+        checks.check_types(db, orator.DatabaseManager)
         checks.check_types(filepath, [str, pathlib.Path])
         checks.check_types(metadata, [str, dict, type(None)])
 
@@ -159,17 +137,19 @@ class QuiltFMS(FMSInterface):
         checks.check_file_exists(filepath)
 
         # check exists
-        hash = self.get_hash(filepath)
-        file_info = self.get_file(hash=hash)
+        md5 = tools.get_file_hash(filepath)
+        sha256 = tools.get_file_hash(filepath, hashlib.sha256)
+        file_info = self.get_file(db=db, md5=md5)
 
         # return if found
         if file_info is not None:
             return file_info
 
-        name = "fms_" + hash
+        name = "fms_" + md5
+
         # create if not
         with tools.suppress_prints():
-            pkg = self._build_file_as_package(filepath, name)
+            self._build_file_as_package(filepath, name)
 
         # import string
         read_pkg = importlib.import_module(name="quilt.data." +
@@ -177,22 +157,26 @@ class QuiltFMS(FMSInterface):
                                                 "." +
                                                 name)
 
-        file_info = self.dsdb._insert_to_table("File",
-                                        {"OriginalFilepath": str(filepath),
-                                         "Filetype": filepath.suffix\
-                                                     .replace(".", ""),
-                                         "ReadPath": read_pkg.load(),
-                                         "MD5": hash,
-                                         "QuiltPackage": pkg,
-                                         "Metadata": metadata,
-                                         "Created": datetime.now()})
+        # file info dict
+        file_info = {
+            "FileId": str(uuid.uuid4()),
+            "OriginalFilepath": str(filepath),
+            "Filetype": filepath.suffix[1:],
+            "ReadPath": read_pkg.load(),
+            "MD5": md5,
+            "SHA256": sha256,
+            "Metadata": metadata,
+            "Created": datetime.now()}
+
+        # insert
+        file_id = db.table("File").insert(file_info)
 
         return file_info
 
 
     def _build_file_as_package(self,
-                               filepath: Union[str, pathlib.Path],
-                               package_name: str) -> str:
+        filepath: Union[str, pathlib.Path],
+        package_name: str) -> str:
         # enforce types
         checks.check_types(filepath, [str, pathlib.Path])
         checks.check_types(package_name, str)
