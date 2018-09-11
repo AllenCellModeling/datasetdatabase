@@ -13,10 +13,10 @@ if _version_extra:
 
 __version__ = '.'.join(map(str, _ver))
 
-CLASSIFIERS = ["Development Status :: 1 - Alpha",
+CLASSIFIERS = ["Development Status :: 5 - Production/Stable",
                "Environment :: Console",
                "Intended Audience :: Science/Research",
-               "License :: OSI Approved :: GNU License",
+               "License :: OSI Approved :: BSD License",
                "Operating System :: OS Independent",
                "Programming Language :: Python",
                "Topic :: Scientific/Engineering"]
@@ -38,7 +38,7 @@ Jackson Maxfield Brown
 jacksonb@alleninstitute.org
 License
 =======
-`DatasetDatabase` is licensed under the terms of the MIT license. See the file
+`DatasetDatabase` is licensed under the terms of the BSD-2 license. See the file
 "LICENSE" for information on the history of this software, terms & conditions
 for usage, and a DISCLAIMER OF ALL WARRANTIES.
 
@@ -52,7 +52,7 @@ MAINTAINER = "Jackson Maxfield Brown"
 MAINTAINER_EMAIL = "jacksonb@alleninstitute.org"
 DESCRIPTION = description
 LONG_DESCRIPTION = long_description
-LICENSE = "GNU"
+LICENSE = "BSD-2"
 AUTHOR = "Jackson Maxfield Brown"
 AUTHOR_EMAIL = "jacksonb@alleninstitute.org"
 PLATFORMS = "OS Independent"
@@ -64,10 +64,20 @@ REQUIRES = ["numpy",
             "quilt",
             "pandas",
             "orator",
-            "pathlib",
             "networkx",
+            "pathlib",
             "matplotlib",
             "sqlalchemy",
             "psycopg2_binary",
             "python_Levenshtein"]
+INSTALLS = ["numpy>=1.15.1",
+            "quilt>=2.9.10",
+            "pandas>=0.23.4",
+            "orator>=0.9.7",
+            "networkx>=2.1",
+            "pathlib>=1.0.1",
+            "matplotlib>=2.2.3",
+            "sqlalchemy>=1.2.10",
+            "psycopg2_binary>=2.7.5",
+            "python_Levenshtein>=0.12.0"]
 SCRIPTS = []

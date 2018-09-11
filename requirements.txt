@@ -1,1 +1,10 @@
-orator
+numpy>=1.15.1
+quilt>=2.9.10
+pandas>=0.23.4
+orator>=0.9.7
+networkx>=2.1
+pathlib>=1.0.1
+matplotlib>=2.2.3
+sqlalchemy>=1.2.10
+psycopg2_binary>=2.7.5
+python_Levenshtein>=0.12.

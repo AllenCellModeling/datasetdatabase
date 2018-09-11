@@ -1208,16 +1208,26 @@ class Dataset(object):
         # enforce types
         checks.check_types(annotation, str)
 
-        self._annotations += {"Value": annotation, "Created": datetime.now()}
+        # add new annotation
+        self._annotations.append(
+            {"Value": annotation,
+             "UserId": self.info.origin.user_info["UserId"],
+             "Created": datetime.now()})
 
+        # send update is possible
+        if self.info is not None:
+            self.update_annotations()
 
-    def _update_annotations(self, database: DatasetDatabase):
-        # enforce types
-        checks.check_types(database, DatasetDatabase)
-
+    def update_annotations(self):
+        # upload annotations missing ids
         for annotation in self.annotations:
             if "AnnotationId" not in annotation:
-                return
+                anno_info = self.info.origin._insert_to_table(
+                    "Annotation", annotation)
+                self.info.origin._insert_to_table("AnnotationDataset",
+                    {"AnnotationId": anno_info["AnnotationId"],
+                     "DatasetId": self.info.id,
+                     "Created": datetime.now()})
 
 
     def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:

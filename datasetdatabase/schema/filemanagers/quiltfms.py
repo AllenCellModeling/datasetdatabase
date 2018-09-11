@@ -122,7 +122,8 @@ class QuiltFMS(FMSInterface):
     def get_or_create_file(self,
         db: orator.DatabaseManager,
         filepath: Union[str, pathlib.Path],
-        metadata: Union[str, dict, None] = None) -> str:
+        metadata: Union[str, dict, None] = None) -> dict:
+        
         # enforce types
         checks.check_types(db, orator.DatabaseManager)
         checks.check_types(filepath, [str, pathlib.Path])

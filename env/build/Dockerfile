@@ -11,10 +11,6 @@ RUN pip install \
     jupyterlab \
     jupyterlab-launcher
 
-# set dir
-WORKDIR /active
-
-# attach current head to bash activate
-RUN echo \
-    "pip install git+https://github.com/AllenCellModeling/datasetdatabase.git" \
-    >> ~/.bashrc
+# install self
+RUN pip install \
+    git+https://github.com/AllenCellModeling/datasetdatabase.git@dataset_object

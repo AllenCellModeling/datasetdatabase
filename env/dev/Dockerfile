@@ -31,4 +31,3 @@ ENV IN_DOCKER=True
 
 # attach setup script to bash
 RUN echo "pip install -e /active" >> ~/.bashrc
-RUN echo "clear" >> ~/.bashrc
