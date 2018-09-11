@@ -645,7 +645,15 @@ class DatasetDatabase(object):
         create_params["output_dataset_name"] = dataset.name
         create_params["output_dataset_description"] = dataset.description
 
-        return self.process(**create_params)
+        current_introspector = dataset.introspector
+        current_annotations = dataset.annotations
+        uploaded = self.process(**create_params)
+        uploaded._introspector = current_introspector
+        uploaded._introspector._validated = True
+        uploaded._annotations = current_annotations
+        uploaded.update_annotations()
+
+        return uploaded
 
 
     def get_dataset(self,

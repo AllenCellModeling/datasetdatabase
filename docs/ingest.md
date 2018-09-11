@@ -21,12 +21,12 @@
     3. [Minimal Step Ingestion](#minimal-step-ingestion)
 
 ## Dataset Creation
-Datasets can be created by providing a path to a a csv, or tsv file, by providing the dataset as a [`pandas.DataFrame`](https://pandas.pydata.org), by reading a serialization created by this package (`.dataset` or a [Quilt](https://quiltdata.io) package), or finally, by joining Datasets based off an Iota found in both (or all). Additionally, you can create a custom deserializer and pass any object to the Dataset initialization. This is more complicated however drastically expands the types of data that can be handled by the system.
+Datasets can be created by providing a path to a csv, by providing the dataset as a [`pandas.DataFrame`](https://pandas.pydata.org), by providing a python dictionary, by passing any python object, by reading a serialization created by this package (`.dataset` or a [Quilt](https://quiltdata.io) package), or finally, by joining Datasets based off shared data between found in both (or all). Additionally, you can create a custom deserializer and pass any object to the Dataset initialization. This is more complicated but greatly increases the types of data that can be handled by the system.
 
 ### DataFrame Like
-Data formats like csv, tsv, and `pandas.DataFrame` were the most common for data scientists to use when this package was under original development. Because of this, they are all handled natively.
+Data formats like csv, python dictionaries, and `pandas.DataFrame` are handled natively.
 
-Datasets are a relatively simply object that largely is a wrapper around a pandas DataFrame object but they additionally some metadata about the state of the Dataset in relation to the database. Let's create a Dataset object in the simplest sense and then go through the state.
+Datasets are the core object of dsdb and are a wrapper around whatever object is passed in, in this case: a `pandas.DataFrame`. They contain additional metadata about the state of the Dataset in relation to the database. Let's create a simple Dataset object and then go through the state.
 
 ```python
 import datasetdatabase as dsdb
@@ -47,17 +47,17 @@ ds
     }
 
 ```python
-ds.obj
+ds.ds
 ```
 |  | foo | bar |
 |:--:|:--|:--|
 | 1 | "hello" | True |
 | 2 | "world" | False |
 
-As you can see from the above representation (`repr`) of the Dataset, in the case of a dataframe like object, a Dataset will be created and the minimum validation fields are created but not validated yet. The minimum validation requirements for dataframe like objects are `filepath_columns`, and validated `types`, `values`, and `files`. There is additionally an "info" attribute, this is what stores the details about a Dataset and how it relates to a database. If this Dataset was pulled from a database, the info field would be populated with a DatasetInfo object. Of note: if there is a DatasetInfo item attached to the info attribute, all other attributes become immutable as that would break the usage of the database. Do not, malform, mutate, or change a Dataset's underlying object data. If you do, the purpose of this package to track, version, deduplicate, and store your data is moot. There are checks in place to detect if a dataset has been malformed in between creation/ ingestion, getting, and processing that will throw errors if differences are found.
+As you can see from the above representation of the Dataset, in the case of a dataframe like object, a Dataset will be created and the minimum validation fields are created but not validated yet. The minimum validation requirements for dataframe like objects are `filepath_columns`, and validated `types`, `values`, and `files`. There is additionally an "info" attribute, this is what stores the details about a Dataset and how it relates to a database. If this Dataset was pulled from a database, the info field would be populated with a DatasetInfo object. Of note: an attached DatasetInfo item indicates the dataset is present in a hosted database and causes all other attributes to become immutable. Object data from this point should be considered read-only but approved functions, such as `dataset.apply`, `dataset.store_files`, etc, may change the object but also update this info state to reflect the changes in the database.
 
 ### Import Dataset
-Due to the size that Datasets can become, and the desire to not have to connect, pull, and rebuild a Dataset object after every break in work. There is a simple pickle serialization of the Dataset object available.
+As Datasets can be quite large and may persist across work sessions, a simple pickle serialization of the Dataset object is available for local storage.
 
 ```python
 ds.save("stored/datasets/1.dataset")
@@ -70,21 +70,29 @@ ds = dsdb.read_dataset("stored/datasets/1.dataset")
 ds
 ```
 
-    info: None,
-    obj: True,
+    info: {
+        id: 2,
+        name: "test_dataset",
+        description: None,
+        introspector: "datasetdatabase.introspect.dataframe.DataFrameIntrospector",
+        md5: "201a338a7507322c4121f0845d8d3a2f",
+        sha256: "82473d0c5ac0e72e085b3e5a200236d39f375c4bdf00daa41bb6ad1836c3b4db",
+        created: datetime.datetime(2018, 9, 11, 0, 45, 42, 413064)
+    },
+    ds: True,
     name: "test_dataset",
     description: None,
-    validated: {
-        types: False,
-        values: False,
-        files: False
-    }
+    introspector: <class "datasetdatabase.introspect.dataframe.DataFrameIntrospector">,
+    validated: True,
+    md5: "201a338a7507322c4121f0845d8d3a2f",
+    sha256: "82473d0c5ac0e72e085b3e5a200236d39f375c4bdf00daa41bb6ad1836c3b4db",
+    annotations: []
 
 Additionally you can also initialize a Dataset object from a Quilt package. This is the reverse operation of taking a Dataset and exporting it to a Quilt package.
 
 ```python
 from quilt.data.user import test_dataset
-ds = dsdb.Dataset(package)
+ds = dsdb.Dataset(test_dataset)
 ds
 ```
 
