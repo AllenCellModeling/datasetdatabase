@@ -10,7 +10,7 @@ Dataset Database (dsdb) is a python package for handling arbitrary datasets (or 
 [https://allencellmodeling.gitbook.io/datasetdatabase/](https://allencellmodeling.gitbook.io/datasetdatabase/)
 
 ***Full Versioning, Deduplication, Validation, and Tracking of Arbitrary Datasets***
-![dataset network graph](./resources/dataset_graph.png)
+![dataset network graph](./docs/resources/dataset_graph.png)
 
 ---
 
@@ -31,6 +31,7 @@ This is an open source project created at the Allen Institute for Cell Science a
 
 ## Contact
 Jackson Maxfield Brown
+
 jacksonb@alleninstitute.org
 
 ## License
@@ -42,4 +43,4 @@ All trademarks referenced herein are property of their respective holders.
 Copyright (c) 2018--, Jackson Maxfield Brown, The Allen Institute for Cell
 Science.
 
-**Last updated: 28 August 2018**
+**Last updated: 11 September 2018**

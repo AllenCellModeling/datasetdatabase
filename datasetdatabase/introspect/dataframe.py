@@ -221,18 +221,25 @@ class DataFrameIntrospector(Introspector):
             self.enforce_files_exist_from_columns(filepath_columns)
 
 
-    def _create_Group(self, row, storage):
-        # create group
+    def _create_Group(self, db, ds_info, row):
+        # all iota are created at the same time
         created = datetime.now()
+
+        # create group
         group = {"Label": str(uuid.uuid4()),
                  "Created": created}
 
-        # add group
-        if group not in storage["Group"]:
-            storage["Group"].append(group)
+        # insert group
+        group = tools.insert_to_db_table(db, "Group", group)
 
-        # find group
-        group_id = storage["Group"].index(group)
+        # create group_dataset
+        group_dataset = {"GroupId": group["GroupId"],
+                         "DatasetId": ds_info.id,
+                         "Created": created}
+
+        # insert group_dataset
+        group_dataset = tools.insert_to_db_table(
+            db, "GroupDataset", group_dataset)
 
         # generate iota and iota_group
         for k, v in row.items():
@@ -241,35 +248,26 @@ class DataFrameIntrospector(Introspector):
                     "Value": pickle.dumps(v),
                     "Created": created}
 
-            # add iota
-            if iota not in storage["Iota"]:
-                storage["Iota"].append(iota)
-
-            # find iota
-            iota_id = storage["Iota"].index(iota)
+            # insert iota
+            iota = tools.insert_to_db_table(db, "Iota", iota)
 
             # create iota_group
-            iota_group = {"IotaId": iota_id,
-                          "GroupId": group_id,
+            iota_group = {"IotaId": iota["IotaId"],
+                          "GroupId": group["GroupId"],
                           "Created": created}
+            # insert iota_group
+            iota_group = tools.insert_to_db_table(db, "IotaGroup", iota_group)
 
-            # add iota_group
-            storage["IotaGroup"].append(iota_group)
 
-
-    def deconstruct(self) -> Dict[str, List[Dict[str, object]]]:
-        storage = {}
-        storage["Iota"] = []
-        storage["Group"] = []
-        storage["IotaGroup"] = []
-
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: dict):
+        # create bar
         bar = ProgressBar(len(self.obj) * len(self.obj.columns),
-                            increment = len(self.obj.columns))
+            increment = len(self.obj.columns))
+
+        # begin teardown
         print("Tearing down object...")
         self.obj.apply(lambda row: bar.apply_and_update(self._create_Group,
-                    row=row, storage=storage), axis=1)
-
-        return storage
+                    db=db, ds_info=ds_info, row=row), axis=1)
 
 
     def package(self):

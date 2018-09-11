@@ -6,8 +6,7 @@ from setuptools import setup, find_packages
 exclude_dirs = ["configs",
                 "docs",
                 "env",
-                "examples",
-                "legacy"]
+                "examples"]
 
 PACKAGES = find_packages(exclude=exclude_dirs)
 

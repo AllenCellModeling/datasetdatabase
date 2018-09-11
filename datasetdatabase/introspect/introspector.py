@@ -43,19 +43,12 @@ class Introspector(abc.ABC):
 
 
     @abc.abstractmethod
-    def deconstruct(self) -> Dict[str, List[Dict[str, object]]]:
+    def deconstruct(self, db, ds_info):
         """
-        Generate a dictionary of lists of Iota, Group, and IotaGroup objects.
-
-        As the Introspector object does not have access to the DatasetDatabase
-        connection, IotaIds and GroupIds should be their index in their
-        respective lists when creating the IotaGroup list.
+        Generate and insert all Iota, Group, IotaGroup, and GroupDataset items
+        in the attached database.
         """
-        storage = {}
-        storage["Iota"] = [{}]
-        storage["Group"] = [{}]
-        storage["IotaGroup"] = [{}]
-        return storage
+        return
 
 
     @abc.abstractmethod

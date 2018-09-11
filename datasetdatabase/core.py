@@ -176,7 +176,8 @@ class DatabaseConstructor(object):
                 self._tables.append(tbl)
 
         # create file table from fms module
-        if self.fms.table_name not in self.tables:
+        if self.fms.table_name not in self.tables and \
+            self.fms.table_name is not None:
             self.fms.create_File(self.orator_schema)
             self._tables.append(self.fms.table_name)
 
@@ -583,41 +584,8 @@ class DatasetDatabase(object):
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
         # deconstruct
-        storage = dataset.introspector.deconstruct()
-
-        iota_ids = []
-        # insert iota
-        for i, iota in enumerate(storage["Iota"]):
-            match = {"list_index": i,
-                     "db_id": self._insert_to_table("Iota", iota)["IotaId"]}
-            iota_ids.append(match)
-
-        # insert groups
-        group_ids = []
-        for i, group in enumerate(storage["Group"]):
-            match = {"list_index": i,
-                     "db_id": self._insert_to_table("Group", group)["GroupId"]}
-            group_ids.append(match)
-
-        # insert iota group joins
-        iota_group_ids = []
-        for i, iota_group in enumerate(storage["IotaGroup"]):
-            iota_match = list(filter(lambda iota_id:
-                iota_id["list_index"] == iota_group["IotaId"], iota_ids))[0]
-            group_match = list(filter(lambda group_id:
-                group_id["list_index"] == iota_group["GroupId"], group_ids))[0]
-            db_iota_group = {"IotaId": iota_match["db_id"],
-                             "GroupId": group_match["db_id"],
-                             "Created": iota_group["Created"]}
-            iota_group_ids.append(self._insert_to_table(
-                "IotaGroup", db_iota_group)["IotaGroupId"])
-
-        # insert group dataset joins
-        for group_id_match in group_ids:
-            group_dataset = {"GroupId": group_id_match["db_id"],
-                             "DatasetId": ds_info.id,
-                             "Created": datetime.now()}
-            self._insert_to_table("GroupDataset", group_dataset)
+        storage = dataset.introspector.deconstruct(
+            db=self.db, ds_info=ds_info)
 
         # attach info to a dataset
         return Dataset(dataset = dataset.ds, ds_info = ds_info)
@@ -742,22 +710,7 @@ class DatasetDatabase(object):
         checks.check_types(table, str)
         checks.check_types(conditions, list)
 
-        # construct orator table
-        table = self.db.table(table)
-
-        # expand multiple conditions
-        if all(isinstance(cond, list) for cond in conditions):
-            for cond in conditions:
-                table = table.where(*cond)
-        # expand single condition
-        else:
-            table = table.where(*conditions)
-
-        # get table
-        table = table.get()
-
-        # format
-        return [dict(item) for item in table]
+        return tools.get_items_from_db_table(self.db, table, conditions)
 
 
     def _insert_to_table(self,
@@ -768,25 +721,7 @@ class DatasetDatabase(object):
         checks.check_types(table, str)
         checks.check_types(items, dict)
 
-        # create conditions
-        conditions = [[k, "=", v] for k, v in items.items() if k != "Created"]
-
-        # check exists
-        found_items = self.get_items_from_table(table, conditions)
-
-        # not found
-        if len(found_items) == 0:
-            id = self.db.table(table)\
-                .insert_get_id(items, sequence=(table + "Id"))
-            id_condition = [table + "Id", "=", id]
-            return self.get_items_from_table(table, id_condition)[0]
-
-        # found
-        if len(found_items) == 1:
-            return found_items[0]
-
-        # database structure error
-        raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+        return tools.insert_to_db_table(self.db, table, items)
 
 
     @property

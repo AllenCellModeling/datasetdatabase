@@ -18,6 +18,7 @@ from ..utils import checks
 BYTE_SIZES = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
 ALLOWED_YES = ["y", "yes"]
 ALLOWED_NO = ["n", "no"]
+TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
 
 
 @contextmanager
@@ -122,3 +123,44 @@ def quick_cast(value, cast_type, info=None):
 def _assert_value(f, val, err):
     # get pass fail
     assert f(val), err
+
+
+def get_items_from_db_table(db, table, conditions):
+    # construct orator table
+    table = db.table(table)
+
+    # expand multiple conditions
+    if all(isinstance(cond, list) for cond in conditions):
+        for cond in conditions:
+            table = table.where(*cond)
+    # expand single condition
+    else:
+        table = table.where(*conditions)
+
+    # get table
+    table = table.get()
+
+    # format
+    return [dict(item) for item in table]
+
+
+def insert_to_db_table(db, table, items):
+    # create conditions
+    conditions = [[k, "=", v] for k, v in items.items() if k != "Created"]
+
+    # check exists
+    found_items = get_items_from_db_table(db, table, conditions)
+
+    # not found
+    if len(found_items) == 0:
+        id = db.table(table)\
+            .insert_get_id(items, sequence=(table + "Id"))
+        id_condition = [table + "Id", "=", id]
+        return get_items_from_db_table(db, table, id_condition)[0]
+
+    # found
+    if len(found_items) == 1:
+        return found_items[0]
+
+    # database structure error
+    raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))

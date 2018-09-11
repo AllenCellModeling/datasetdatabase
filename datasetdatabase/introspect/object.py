@@ -4,12 +4,13 @@
 from typing import Dict, List, Union
 from datetime import datetime
 import pickle
+import orator
 import types
 import uuid
 
 # self
 from .introspector import Introspector
-from ..utils import checks
+from ..utils import checks, tools
 
 
 class ObjectIntrospector(Introspector):
@@ -51,21 +52,41 @@ class ObjectIntrospector(Introspector):
             self._validated = True
 
 
-    def deconstruct(self) -> Dict[str, List[Dict[str, object]]]:
-        storage = {}
-
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: dict):
         # all iota are created at the same time
         created = datetime.now()
 
-        storage["Iota"] = [{"Key": "obj",
-                            "Value": pickle.dumps(self.obj),
-                            "Created": created}]
-        storage["Group"] = [{"Label": str(uuid.uuid4()),
-                             "Created": created}]
-        storage["IotaGroup"] = [{"IotaId": 0,
-                                 "GroupId": 0,
-                                 "Created": created}]
-        return storage
+        # create group
+        group = {"Label": str(uuid.uuid4()),
+                 "Created": created}
+
+        # insert group
+        group = tools.insert_to_db_table(db, "Group", group)
+
+        # create group_dataset
+        group_dataset = {"GroupId": group["GroupId"],
+                         "DatasetId": ds_info.id,
+                         "Created": created}
+
+        # insert group_dataset
+        group_dataset = tools.insert_to_db_table(
+            db, "GroupDataset", group_dataset)
+
+        # create iota
+        iota = {"Key": "obj",
+                "Value": pickle.dumps(self.obj),
+                "Created": created}
+
+        # insert iota
+        iota = tools.insert_to_db_table(db, "Iota", iota)
+
+        # create iota_group
+        iota_group = {"IotaId": iota["IotaId"],
+                      "GroupId": group["GroupId"],
+                      "Created": created}
+
+        # insert iota_group
+        iota_group = tools.insert_to_db_table(db, "IotaGroup", iota_group)
 
 
     def package(self):

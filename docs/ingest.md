@@ -319,4 +319,4 @@ To wrap up, while it's not recommended, all of this functionality can be incredi
 
 That about wraps up all the information about Dataset creation and ingestion. Questions and issues can be pointed at the [project repository issues tracker](https://github.com/AllenCellModeling/datasetdatabase/issues).
 
-**Last updated: 28 August 2018**
+**Last updated: 11 September 2018**

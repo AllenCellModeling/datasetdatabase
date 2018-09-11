@@ -10,7 +10,7 @@ import uuid
 
 # self
 from ..schema.filemanagers import FMSInterface
-from ..utils import checks, ProgressBar
+from ..utils import checks, tools, ProgressBar
 from .introspector import Introspector
 
 
@@ -52,23 +52,42 @@ class DictionaryIntrospector(Introspector):
             self._validated = {**self._validated, **new_validations}
 
 
-    def deconstruct(self) -> Dict[str, List[Dict[str, object]]]:
-        storage = {}
-
+    def deconstruct(self, db, ds_info):
         # all iota are created at the same time
         created = datetime.now()
 
-        storage["Iota"] = [{"Key": k,
-                            "Value": pickle.dumps(v),
-                            "Created": created}
-                            for k, v in self.obj.items()]
-        storage["Group"] = [{"Label": str(uuid.uuid4()),
-                             "Created": created}]
-        storage["IotaGroup"] = [{"IotaId": i,
-                                 "GroupId": 0,
-                                 "Created": created}
-                                 for i in range(len(storage["Iota"]))]
-        return storage
+        # create group
+        group = {"Label": str(uuid.uuid4()),
+                 "Created": created}
+
+        # insert group
+        group = tools.insert_to_db_table(db, "Group", group)
+
+        # create group_dataset
+        group_dataset = {"GroupId": group["GroupId"],
+                         "DatasetId": ds_info.id,
+                         "Created": created}
+
+        # insert group_dataset
+        group_dataset = tools.insert_to_db_table(
+            db, "GroupDataset", group_dataset)
+
+        for k, v in self.obj.items():
+            # create iota
+            iota = {"Key": k,
+                    "Value": v,
+                    "Created": created}
+
+            # insert iota
+            iota = tools.insert_to_db_table(db, "Iota", iota)
+
+            # create iota_group
+            iota_group = {"IotaId": iota["IotaId"],
+                          "GroupId": group["GroupId"],
+                          "Created": created}
+
+            # insert iota_group
+            iota_group = tools.insert_to_db_table(db, "IotaGroup", iota_group)
 
 
     def store_files(self,
