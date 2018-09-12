@@ -312,7 +312,7 @@ def reconstruct(db: orator.DatabaseManager,
     bar = ProgressBar(len(group_datasets))
 
     # get safe thread count
-    n_threads = cpu_count() * 8
+    n_threads = cpu_count() * 6
 
     # create pool
     pool = Pool(n_threads)
