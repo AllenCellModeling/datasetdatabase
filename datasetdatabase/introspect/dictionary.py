@@ -75,7 +75,7 @@ class DictionaryIntrospector(Introspector):
         for k, v in self.obj.items():
             # create iota
             iota = {"Key": k,
-                    "Value": v,
+                    "Value": pickle.dumps(v),
                     "Created": created}
 
             # insert iota

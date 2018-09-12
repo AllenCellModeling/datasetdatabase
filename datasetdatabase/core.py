@@ -63,6 +63,8 @@ class DatabaseConfig(object):
         if isinstance(config, str):
             config = pathlib.Path(config)
         if isinstance(config, pathlib.Path):
+            config = config.expanduser()
+            config = config.resolve()
             with open(config, "r") as read_in:
                 config = json.load(read_in)
 
@@ -230,7 +232,7 @@ class DatabaseConstructor(object):
 
 class DatasetDatabase(object):
     def __init__(self,
-        config: Union[DatabaseConfig, str, pathlib.Path, None] = None,
+        config: Union[DatabaseConfig, str, pathlib.Path, dict, None] = None,
         user: Union[str, None] = None,
         constructor: Union[DatabaseConstructor, None] = None,
         build: bool = False,
@@ -238,7 +240,7 @@ class DatasetDatabase(object):
 
         # enforce types
         checks.check_types(config,
-                           [DatabaseConfig, str, pathlib.Path, type(None)])
+            [DatabaseConfig, str, pathlib.Path, dict, type(None)])
         checks.check_types(user, [str, type(None)])
         checks.check_types(constructor, [DatabaseConstructor, type(None)])
         checks.check_types(recent_size, int)
