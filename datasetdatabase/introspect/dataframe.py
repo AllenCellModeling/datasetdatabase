@@ -259,7 +259,7 @@ class DataFrameIntrospector(Introspector):
             iota_group = tools.insert_to_db_table(db, "IotaGroup", iota_group)
 
 
-    def deconstruct(self, db: orator.DatabaseManager, ds_info: dict):
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
         # create bar
         bar = ProgressBar(len(self.obj) * len(self.obj.columns),
             increment = len(self.obj.columns))
@@ -277,21 +277,40 @@ class DataFrameIntrospector(Introspector):
         return package
 
 
-def reconstruct(items: Dict[str, Dict[str, object]]) -> pd.DataFrame:
-    rows = {}
-    for iota_group in items["IotaGroup"]:
-        for i, iota in enumerate(items["Iota"]):
-            if iota["IotaId"] == iota_group["IotaId"]:
-                break
-        for i, group in enumerate(items["Group"]):
-            if group["GroupId"] == iota_group["GroupId"]:
-                break
+def reconstruct(db: orator.DatabaseManager,
+    ds_info: "DatasetInfo") -> pd.DataFrame:
+    # create group_datasets
+    group_datasets = tools.get_items_from_db_table(
+        db, "GroupDataset", ["DatasetId", "=", ds_info.id])
 
-        try:
-            rows[group["Label"]] = {**rows[group["Label"]],
-                **{iota["Key"]: pickle.loads(iota["Value"])}}
-        except KeyError:
-            rows[group["Label"]] = {
-                **{iota["Key"]: pickle.loads(iota["Value"])}}
+    # create rows
+    rows = []
 
-    return pd.DataFrame(list(rows.values()))
+    # create groups
+    print("Reconstructing dataset...")
+    bar = ProgressBar(len(group_datasets))
+
+    for group_dataset in group_datasets:
+        # create iota_groups
+        iota_groups = tools.get_items_from_db_table(
+            db, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
+
+        # create group
+        group = {}
+        for iota_group in iota_groups:
+            # create iota
+            iota = tools.get_items_from_db_table(
+                db, "Iota", ["IotaId", "=", iota_group["IotaId"]])[0]
+
+            # read value and attach to group
+            group[iota["Key"]] = pickle.loads(iota["Value"])
+
+
+        # attach completed group to rows
+        rows.append(group)
+
+        # update progress
+        bar.increment()
+
+    # return dataframe
+    return pd.DataFrame(rows)

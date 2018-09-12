@@ -52,7 +52,7 @@ class DictionaryIntrospector(Introspector):
             self._validated = {**self._validated, **new_validations}
 
 
-    def deconstruct(self, db, ds_info):
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
         # all iota are created at the same time
         created = datetime.now()
 
@@ -72,6 +72,8 @@ class DictionaryIntrospector(Introspector):
         group_dataset = tools.insert_to_db_table(
             db, "GroupDataset", group_dataset)
 
+        # create items
+        bar = ProgressBar(len(self.obj.keys()))
         for k, v in self.obj.items():
             # create iota
             iota = {"Key": k,
@@ -88,6 +90,9 @@ class DictionaryIntrospector(Introspector):
 
             # insert iota_group
             iota_group = tools.insert_to_db_table(db, "IotaGroup", iota_group)
+
+            # update progress
+            bar.increment()
 
 
     def store_files(self,
@@ -133,7 +138,37 @@ class DictionaryIntrospector(Introspector):
         return func(self.obj[key])
 
 
-def reconstruct(items: Dict[str, Dict[str, object]]) -> dict:
-    obj = {i["Key"]: pickle.loads(i["Value"])
-                    for i in items["Iota"]}
-    return obj
+def reconstruct(db: orator.DatabaseManager, ds_info: "DatasetInfo") -> dict:
+    # create group_datasets
+    group_datasets = tools.get_items_from_db_table(
+        db, "GroupDataset", ["DatasetId", "=", ds_info.id])
+
+    # create items
+    items = {}
+
+    for group_dataset in group_datasets:
+        # create iota_groups
+        iota_groups = tools.get_items_from_db_table(
+            db, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
+
+        # create groups
+        print("Reconstructing dataset...")
+        bar = ProgressBar(len(iota_groups))
+
+        # create group
+        group = {}
+        for iota_group in iota_groups:
+            # create iota
+            iota = tools.get_items_from_db_table(
+                db, "Iota", ["IotaId", "=", iota_group["IotaId"]])[0]
+
+            # read value and attach to group
+            group[iota["Key"]] = pickle.loads(iota["Value"])
+
+            # update progress
+            bar.increment()
+
+        # attach completed group to items
+        items = {**items, **group}
+
+    return items

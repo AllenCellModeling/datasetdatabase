@@ -670,35 +670,8 @@ class DatasetDatabase(object):
         else:
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
-        # create items map
-        items = {}
-
-        # get group dataset joins
-        group_dataset = self.get_items_from_table(
-            "GroupDataset", ["DatasetId", "=", ds_info.id])
-
-        # get groups
-        group = []
-        for gd in group_dataset:
-            group += self.get_items_from_table(
-                "Group", ["GroupId", "=", gd["GroupId"]])
-        items["Group"] = group
-
-        # get iota group joins
-        iota_group = []
-        for g in group:
-            iota_group += self.get_items_from_table(
-                "IotaGroup", ["GroupId", "=", g["GroupId"]])
-        items["IotaGroup"] = iota_group
-
-        # get iota
-        iota = []
-        for ig in iota_group:
-            iota += self.get_items_from_table(
-                "Iota", ["IotaId", "=", ig["IotaId"]])
-        items["Iota"] = iota
-
-        obj = RECONSTRUCTOR_MAP[ds_info.introspector](items)
+        obj = RECONSTRUCTOR_MAP[ds_info.introspector](
+            db=self.db, ds_info=ds_info)
 
         return Dataset(dataset=obj, ds_info=ds_info)
 

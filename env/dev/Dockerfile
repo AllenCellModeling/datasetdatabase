@@ -4,7 +4,7 @@ FROM jupyter/minimal-notebook
 RUN pip install --upgrade pip
 
 # expose for notebook/ lab
-EXPOSE 8888
+EXPOSE 8080
 
 # install lab
 RUN pip install \

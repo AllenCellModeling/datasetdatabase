@@ -103,6 +103,30 @@ class ObjectIntrospector(Introspector):
         return func(getattr(self.obj, item))
 
 
-def reconstruct(items: Dict[str, Dict[str, object]]) -> object:
-    obj = pickle.loads(items["Iota"][0]["Value"])
+def reconstruct(db: orator.DatabaseManager, ds_info: "DatasetInfo") -> obj:
+    # create group_datasets
+    group_datasets = tools.get_items_from_db_table(
+        db, "GroupDataset", ["DatasetId", "=", ds_info.id])
+
+    # obj
+    obj = None
+
+    for group_dataset in group_datasets:
+        # create iota_groups
+        iota_groups = tools.get_items_from_db_table(
+            db, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
+
+        # create groups
+        print("Reconstructing dataset...")
+
+        # create group
+        group = {}
+        for iota_group in iota_groups:
+            # create iota
+            iota = tools.get_items_from_db_table(
+                db, "Iota", ["IotaId", "=", iota_group["IotaId"]])[0]
+
+            # read value and attach to group
+            obj = pickle.loads(iota["Value"])
+
     return obj
