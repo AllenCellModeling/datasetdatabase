@@ -4,13 +4,13 @@
 from pandas import read_csv as pd_read_csv
 from typing import Union, Dict, List
 from datetime import datetime
+import _pickle as pickle
 import subprocess
 import importlib
 import inspect
 import pathlib
 import hashlib
 import orator
-import pickle
 import types
 import json
 import uuid
@@ -46,8 +46,6 @@ MISSING_INIT = "Must provide either an object or a DatasetInfo object."
 TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
 DATASET_NOT_FOUND = "Dataset not found using keyword arguments:\n\t{kw}"
 
-EXTENSION_MAP = {".csv": pd_read_csv,
-                 ".dataset": tools.read_pickle}
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 
@@ -1157,11 +1155,11 @@ class Dataset(object):
 
         # dump dataset
         path = path.with_suffix(".dataset")
-        to_save = Dataset(self.ds,
-                          self.info,
-                          self.name,
-                          self.description,
-                          self.introspector)
+        to_save = {"obj": self.ds,
+                   "id": self.info.id,
+                   "config": self.info.origin.config,
+                   "user": self.info.origin.user}
+
         tools.write_pickle(to_save, path)
 
         return path
@@ -1186,6 +1184,24 @@ def _return_dataset_obj(dataset):
     return dataset.ds
 
 
+def _read_csv(path: pathlib.Path) -> Dataset:
+    return Dataset(pd_read_csv(path))
+
+
+def _read_dataset(path: pathlib.Path) -> Dataset:
+    saved = tools.read_pickle(path)
+    database = DatasetDatabase(saved["config"], user=saved["user"])
+    ds_info = database.get_items_from_table(
+        "Dataset", ["DatasetId", "=", saved["id"]])[0]
+    ds_info["OriginDb"] = database
+    ds_info = DatasetInfo(**ds_info)
+
+    return Dataset(dataset=saved["obj"], ds_info=ds_info)
+
+
+EXTENSION_MAP = {".csv": pd_read_csv,
+                 ".dataset": _read_dataset}
+
 def read_dataset(path: Union[str, pathlib.Path]):
     # enforce types
     checks.check_types(path, [str, pathlib.Path])
@@ -1196,14 +1212,12 @@ def read_dataset(path: Union[str, pathlib.Path]):
     # attempt read
     try:
         if path.suffix in EXTENSION_MAP:
-            ds = EXTENSION_MAP[path.suffix](path)
-        else:
-            ds = tools.read_pickle(path)
+            return EXTENSION_MAP[path.suffix](path)
+
+        ds = tools.read_pickle(path)
+        return Dataset(ds)
     except pickle.UnpicklingError:
         UNKNOWN_EXTENSION.format(p=path)
-
-    # return
-    return Dataset(ds)
 
 
 # delayed globals

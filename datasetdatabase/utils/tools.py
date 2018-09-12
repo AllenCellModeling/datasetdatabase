@@ -3,9 +3,9 @@
 # installed
 from contextlib import contextmanager
 from typing import Union
+import _pickle as pickle
 import pathlib
 import hashlib
-import pickle
 import types
 import math
 import sys
@@ -55,8 +55,9 @@ def write_pickle(obj: object, path: Union[str, pathlib.Path]) -> pathlib.Path:
     # convert types
     path = pathlib.Path(path)
 
+    # write
     with open(path, "wb") as write_out:
-        pickle.dump(obj, path)
+        pickle.dump(obj, write_out)
 
     return path
 

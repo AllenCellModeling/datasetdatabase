@@ -3,7 +3,7 @@
 # installed
 from typing import Dict, List, Union
 from datetime import datetime
-import pickle
+import _pickle as pickle
 import orator
 import types
 import uuid

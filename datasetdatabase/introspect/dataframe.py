@@ -3,9 +3,9 @@
 # installed
 from typing import Dict, List, Union
 from datetime import datetime
+import _pickle as pickle
 import pandas as pd
 import orator
-import pickle
 import types
 import uuid
 
