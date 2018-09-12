@@ -12,3 +12,4 @@ fp_example/
 # generated files
 .DS_STORE
 local.db
+test.dataset

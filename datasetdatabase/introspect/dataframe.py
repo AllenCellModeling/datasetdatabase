@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
 # installed
+from multiprocessing.dummy import Pool
 from typing import Dict, List, Union
 from datetime import datetime
+from functools import partial
 import _pickle as pickle
+from os import cpu_count
 import pandas as pd
 import orator
 import types
@@ -277,40 +280,46 @@ class DataFrameIntrospector(Introspector):
         return package
 
 
+def _reconstruct_group(group_dataset, database, progress_bar):
+    # create iota_groups
+    iota_groups = tools.get_items_from_db_table(
+        database, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
+
+    # create group
+    group = {}
+    for iota_group in iota_groups:
+        # create iota
+        iota = tools.get_items_from_db_table(
+            database, "Iota", ["IotaId", "=", iota_group["IotaId"]])[0]
+
+        # read value and attach to group
+        group[iota["Key"]] = pickle.loads(iota["Value"])
+
+    # update progress
+    progress_bar.increment()
+
+    return group
+
+
 def reconstruct(db: orator.DatabaseManager,
     ds_info: "DatasetInfo") -> pd.DataFrame:
     # create group_datasets
     group_datasets = tools.get_items_from_db_table(
         db, "GroupDataset", ["DatasetId", "=", ds_info.id])
 
-    # create rows
-    rows = []
-
     # create groups
     print("Reconstructing dataset...")
     bar = ProgressBar(len(group_datasets))
 
-    for group_dataset in group_datasets:
-        # create iota_groups
-        iota_groups = tools.get_items_from_db_table(
-            db, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
+    # get safe thread count
+    n_threads = cpu_count() * 8
 
-        # create group
-        group = {}
-        for iota_group in iota_groups:
-            # create iota
-            iota = tools.get_items_from_db_table(
-                db, "Iota", ["IotaId", "=", iota_group["IotaId"]])[0]
+    # create pool
+    pool = Pool(n_threads)
 
-            # read value and attach to group
-            group[iota["Key"]] = pickle.loads(iota["Value"])
-
-
-        # attach completed group to rows
-        rows.append(group)
-
-        # update progress
-        bar.increment()
+    # map pool
+    func = partial(_reconstruct_group, database=db, progress_bar=bar)
+    rows = pool.map(func, group_datasets)
 
     # return dataframe
     return pd.DataFrame(rows)
