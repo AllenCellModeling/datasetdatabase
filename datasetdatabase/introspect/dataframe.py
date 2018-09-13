@@ -311,15 +311,16 @@ def reconstruct(db: orator.DatabaseManager,
     print("Reconstructing dataset...")
     bar = ProgressBar(len(group_datasets))
 
+    # create func
+    func = partial(_reconstruct_group, database=db, progress_bar=bar)
+
     # get safe thread count
     n_threads = cpu_count() * 4
 
     # create pool
-    pool = Pool(n_threads)
-
-    # map pool
-    func = partial(_reconstruct_group, database=db, progress_bar=bar)
-    rows = pool.map(func, group_datasets)
+    with Pool(n_threads) as pool:
+        # map pool
+        rows = pool.map(func, group_datasets)
 
     # return dataframe
     return pd.DataFrame(rows)
