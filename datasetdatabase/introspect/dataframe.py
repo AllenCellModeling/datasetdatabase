@@ -6,11 +6,11 @@ from typing import Dict, List, Union
 from datetime import datetime
 from functools import partial
 import _pickle as pickle
-from os import cpu_count
 import pandas as pd
 import orator
 import types
 import uuid
+import os
 
 # self
 from ..schema.filemanagers import FMSInterface
@@ -315,7 +315,10 @@ def reconstruct(db: orator.DatabaseManager,
     func = partial(_reconstruct_group, database=db, progress_bar=bar)
 
     # get safe thread count
-    n_threads = cpu_count() * 4
+    if "DSDB_PROCESS_LIMIT" in os.environ:
+        n_threads = int(os.environ["DSDB_PROCESS_LIMIT"])
+    else:
+        n_threads = os.cpu_count()
 
     # create pool
     with Pool(n_threads) as pool:
