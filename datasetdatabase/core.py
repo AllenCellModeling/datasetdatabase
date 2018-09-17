@@ -287,7 +287,7 @@ class DatabaseConstructor(object):
 
         # drop
         for tbl in drop_order:
-            self._orator_schema.drop_if_exists(tbl)
+            self.orator_schema.drop_if_exists(tbl)
 
 
     def get_tables(self):
