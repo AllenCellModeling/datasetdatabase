@@ -202,6 +202,7 @@ class DatabaseConstructor(object):
         self._fms = fms
         self._tables = []
         self._db = orator.DatabaseManager(dict(self.config))
+        self._orator_schema = orator.Schema(self.db)
 
 
     @property
@@ -270,9 +271,6 @@ class DatabaseConstructor(object):
     def build(self):
         # run preparation steps
         self.prepare_connection()
-
-        # connect
-        self._orator_schema = orator.Schema(self.db)
 
         # create schema
         self.create_schema()
