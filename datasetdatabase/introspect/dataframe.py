@@ -224,54 +224,35 @@ class DataFrameIntrospector(Introspector):
             self.enforce_files_exist_from_columns(filepath_columns)
 
 
-    def _create_Group(self, db, ds_info, row):
-        # all iota are created at the same time
-        created = datetime.now()
-
-        # create group
-        group = {"Label": str(uuid.uuid4()),
-                 "Created": created}
-
-        # insert group
-        group = tools.insert_to_db_table(db, "Group", group)
-
-        # create group_dataset
-        group_dataset = {"GroupId": group["GroupId"],
-                         "DatasetId": ds_info.id,
-                         "Created": created}
-
-        # insert group_dataset
-        group_dataset = tools.insert_to_db_table(
-            db, "GroupDataset", group_dataset)
-
-        # generate iota and iota_group
-        for k, v in row.items():
-            # create iota
-            iota = {"Key": k,
-                    "Value": pickle.dumps(v),
-                    "Created": created}
-
-            # insert iota
-            iota = tools.insert_to_db_table(db, "Iota", iota)
-
-            # create iota_group
-            iota_group = {"IotaId": iota["IotaId"],
-                          "GroupId": group["GroupId"],
-                          "Created": created}
-            # insert iota_group
-            iota_group = tools.insert_to_db_table(db, "IotaGroup", iota_group)
-
-
     def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
         # create bar
-        bar = ProgressBar(len(self.obj) * len(self.obj.columns),
-            increment = len(self.obj.columns))
+        bar = ProgressBar(len(self.obj))
 
         # begin teardown
         print("Tearing down object...")
-        self.obj.apply(lambda row: bar.apply_and_update(self._create_Group,
-                    db=db, ds_info=ds_info, row=row), axis=1)
 
+        # create func
+        func = partial(_deconstruct_Group,
+                       database=db,
+                       ds_info=ds_info,
+                       progress_bar=bar)
+
+        # get safe thread count
+        if "DSDB_PROCESS_LIMIT" in os.environ:
+            n_threads = int(os.environ["DSDB_PROCESS_LIMIT"])
+        else:
+            n_threads = os.cpu_count()
+
+        # insert row labels
+        rows = self.obj.apply(lambda row: _insert_row_label(row), axis=1)
+
+        # pre build rows
+        rows = rows.to_dict("records")
+
+        # create pool
+        with Pool(n_threads) as pool:
+            # map pool
+            pool.map(func, rows)
 
     def package(self):
         package = {}
@@ -280,10 +261,65 @@ class DataFrameIntrospector(Introspector):
         return package
 
 
+def _insert_row_label(row):
+    row["__DSDB_GROUP_LABEL__"] = row.name
+    return row
+
+
+def _deconstruct_Group(row, database, ds_info, progress_bar):
+    # all iota are created at the same time
+    created = datetime.now()
+
+    # create group
+    group = {"Label": str(row["__DSDB_GROUP_LABEL__"]),
+             "Created": created}
+
+    # remove label
+    row.pop("__DSDB_GROUP_LABEL__", None)
+
+    # insert group
+    group = tools.insert_to_db_table(database, "Group", group)
+
+    # create group_dataset
+    group_dataset = {"GroupId": group["GroupId"],
+                     "DatasetId": ds_info.id,
+                     "Created": created}
+
+    # insert group_dataset
+    group_dataset = tools.insert_to_db_table(
+        database, "GroupDataset", group_dataset)
+
+    # generate iota and iota_group
+    for k, v in row.items():
+        # create iota
+        iota = {"Key": k,
+                "Value": pickle.dumps(v),
+                "Created": created}
+
+        # insert iota
+        iota = tools.insert_to_db_table(database, "Iota", iota)
+
+        # create iota_group
+        iota_group = {"IotaId": iota["IotaId"],
+                      "GroupId": group["GroupId"],
+                      "Created": created}
+        # insert iota_group
+        iota_group = tools.insert_to_db_table(
+            database, "IotaGroup", iota_group)
+
+    # update progress
+    progress_bar.increment()
+
+
 def _reconstruct_group(group_dataset, database, progress_bar):
     # create iota_groups
     iota_groups = tools.get_items_from_db_table(
         database, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
+
+    # get label
+    group = tools.get_items_from_db_table(
+        database, "Group", ["GroupId", "=", group_dataset["GroupId"]])
+    label = int(group[0]["Label"])
 
     # create group
     group = {}
@@ -294,6 +330,9 @@ def _reconstruct_group(group_dataset, database, progress_bar):
 
         # read value and attach to group
         group[iota["Key"]] = pickle.loads(iota["Value"])
+
+        # attach label for reorder
+        group["__DSDB_GROUP_LABEL__"] = label
 
     # update progress
     progress_bar.increment()
@@ -325,5 +364,10 @@ def reconstruct(db: orator.DatabaseManager,
         # map pool
         rows = pool.map(func, group_datasets)
 
+    # sort
+    df = pd.DataFrame(rows)
+    df = df.sort_values(by="__DSDB_GROUP_LABEL__")
+    df = df.drop(labels="__DSDB_GROUP_LABEL__", axis=1)
+
     # return dataframe
-    return pd.DataFrame(rows)
+    return df

@@ -103,7 +103,9 @@ class ObjectIntrospector(Introspector):
         return func(getattr(self.obj, item))
 
 
-def reconstruct(db: orator.DatabaseManager, ds_info: "DatasetInfo") -> object:
+def reconstruct(db: orator.DatabaseManager,
+    ds_info: "DatasetInfo",
+    in_order: bool = False) -> object:
     # create group_datasets
     group_datasets = tools.get_items_from_db_table(
         db, "GroupDataset", ["DatasetId", "=", ds_info.id])

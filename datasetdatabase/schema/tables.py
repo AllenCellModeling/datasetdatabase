@@ -46,6 +46,7 @@ def create_Group(schema: orator.Schema):
             table.string("Label")
             table.datetime("Created")
 
+
 def create_IotaGroup(schema: orator.Schema):
     # enforce types
     checks.check_types(schema, orator.Schema)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # installed
+from orator.exceptions.query import QueryException
 from contextlib import contextmanager
 from typing import Union
 import _pickle as pickle
@@ -54,6 +55,10 @@ def write_pickle(obj: object, path: Union[str, pathlib.Path]) -> pathlib.Path:
 
     # convert types
     path = pathlib.Path(path)
+
+    # expand path
+    path = path.expanduser()
+    path = path.resolve()
 
     # write
     with open(path, "wb") as write_out:
@@ -154,10 +159,14 @@ def insert_to_db_table(db, table, items):
 
     # not found
     if len(found_items) == 0:
-        id = db.table(table)\
-            .insert_get_id(items, sequence=(table + "Id"))
-        id_condition = [table + "Id", "=", id]
-        return get_items_from_db_table(db, table, id_condition)[0]
+        # handle multiprocessed inserts
+        try:
+            id = db.table(table)\
+                .insert_get_id(items, sequence=(table + "Id"))
+            id_condition = [table + "Id", "=", id]
+            return get_items_from_db_table(db, table, id_condition)[0]
+        except QueryException:
+            return get_items_from_db_table(db, table, conditions)[0]
 
     # found
     if len(found_items) == 1:

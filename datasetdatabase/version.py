@@ -1,7 +1,7 @@
 # Format expected by setup.py and doc/source/conf.py: string of form "X.Y.Z"
 _version_major = 1
 _version_minor = 0
-_version_micro = 9
+_version_micro = 10
 _version_extra = 'stable'
 
 # Construct full version string from these.
@@ -68,8 +68,7 @@ REQUIRES = ["numpy",
             "pathlib",
             "matplotlib",
             "sqlalchemy",
-            "psycopg2_binary",
-            "python_Levenshtein"]
+            "psycopg2_binary"]
 INSTALLS = ["numpy>=1.15.1",
             "quilt>=2.9.10",
             "pandas>=0.23.4",
@@ -78,6 +77,5 @@ INSTALLS = ["numpy>=1.15.1",
             "pathlib>=1.0.1",
             "matplotlib>=2.2.3",
             "sqlalchemy>=1.2.10",
-            "psycopg2_binary>=2.7.5",
-            "python_Levenshtein>=0.12.0"]
+            "psycopg2_binary>=2.7.5"]
 SCRIPTS = []

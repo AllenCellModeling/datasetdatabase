@@ -50,9 +50,61 @@ UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 
 class DatabaseConfig(object):
+    """
+    DatabaseConfig is an object that's sole purpose to open a json file, and
+    enforce that all required attributes needed to open a connection to a
+    database are present.
+    """
+
     def __init__(self,
         config: Union[str, pathlib.Path, Dict[str, str]],
         name: Union[str, None] = None):
+        """
+        Create a DatabaseConfig.
+
+        A DatabaseConfig is an object you can create before connecting to a
+        DatasetDatabase, but more commonly this object will be created by a
+        DatabaseConstructor in the process of connecting or building. A minimum
+        requirements config needs just "driver" and "database" attributes.
+
+        Example
+        ==========
+        ```
+        >>> DatabaseConfig("/path/to/valid/config.json")
+        {"name": "local",
+         "config": {
+            "driver": "sqlite",
+            "database": "local.db"}
+        }
+
+        >>> DatabaseConfig("/path/to/invalid/config.json")
+        AssertionError: "Config must have ('driver', 'database')."
+
+        ```
+
+        Parameters
+        ==========
+        config: str, pathlib.Path, Dict[str: str]
+            A string, or pathlib.Path path to a json file storing the
+            connection config information. Or a dictionary of string keys and
+            string values as a connection config.
+        name: str, None = None
+            A specific name for this connection. If none is passed the name
+            gets set to the value stored by the "database" key in the passed
+            config.
+
+        Returns
+        ==========
+        self
+
+        Errors
+        ==========
+        AssertionError
+            One or more of the required config attributes are missing from the
+            passed config.
+
+        """
+
         # enforce types
         checks.check_types(name, [str, type(None)])
         checks.check_types(config, [str, pathlib.Path, dict])
@@ -79,35 +131,68 @@ class DatabaseConfig(object):
                             .with_suffix("")\
                             .name
 
-
-    def __iter__(self):
-        yield self.name, self.config
-
-
     @property
     def config(self):
         return self._config
 
+    def __iter__(self):
+        yield self.name, self.config
 
     def __str__(self):
         return str(dict(self))
-
 
     def __repr__(self):
         return str(self)
 
 
 class DatabaseConstructor(object):
+    """
+    DatabaseConstructor is an object that will handle the construction,
+    teardown, and reconnection of a DatasetDatabase to the passed
+    DatabaseConfig. It will also manage the construction, teardown, and
+    reconnection of the passed FMSInterface.
+    """
+
     def __init__(self,
-        config: Union[DatabaseConfig, None],
+        config: Union[DatabaseConfig, None] = None,
         schema: Union[SchemaVersion, None] = None,
         fms: Union[FMSInterface, None] = None):
+        """
+        Created a DatabaseConstructor.
+
+        A DatabaseConstructor is an object used to create, teardown, or
+        reconnect to both a database and the assoicated FMS. You can provide
+        both a custom DatasetDatabase schema and a custom FMS interface.
+
+        Example
+        ==========
+        ```
+        >>> DatabaseConstructor().config
+        {"name": "local",
+         "config": {
+            "driver": "sqlite",
+            "database": "local.db"
+         }
+        }
+
+        >>> config = DatabaseConfig("path/to/valid/config.json")
+        >>> DatabaseConstructor(config)
+        <class DatabaseConstructor ... >
+
+        ```
+
+        Parameters
+        ==========
+        config: DatabaseConfig, None = None
+
+        """
 
         # enforce types
         checks.check_types(config, [DatabaseConfig, type(None)])
         checks.check_types(schema, [SchemaVersion, type(None)])
         checks.check_types(fms, [FMSInterface, type(None)])
 
+        # default config is local
         if config is None:
             config = LOCAL
 
@@ -195,7 +280,7 @@ class DatabaseConstructor(object):
         return self.db
 
 
-    def drop_schema(self):
+    def _drop_schema(self):
         # get drop order
         drop_order = list(self.schema.tables)
         drop_order.reverse()
@@ -480,6 +565,7 @@ class DatasetDatabase(object):
                                                 algorithm_description,
                                                 algorithm_version)
 
+        print("Storing algorithm parameters.")
         # check parameters for dsdb parameters
         if algorithm_name == "dsdb.Dataset.store_files":
             db = algorithm_parameters.pop("db", None)
@@ -497,7 +583,9 @@ class DatasetDatabase(object):
                 description="algorithm parameters")
 
         # begin
-        print("Dataset processing has begun...")
+        if algorithm_name != "dsdb.DatasetDatabase.upload_dataset":
+            print("Dataset processing has begun...")
+
         begin = datetime.now()
 
         # run
@@ -505,7 +593,8 @@ class DatasetDatabase(object):
 
         # end
         end = datetime.now()
-        print("Dataset processing has ended...")
+        if algorithm_name != "dsdb.DatasetDatabase.upload_dataset":
+            print("Dataset processing has ended...")
 
         # ingest output
         output = self._create_dataset(output,
@@ -559,6 +648,7 @@ class DatasetDatabase(object):
             ds_info["OriginDb"] = self
             ds_info = DatasetInfo(**ds_info)
 
+            print("Input dataset already exists in database.")
             return Dataset(dataset=dataset.ds, ds_info=ds_info)
 
         # not found
@@ -584,7 +674,7 @@ class DatasetDatabase(object):
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
         # deconstruct
-        storage = dataset.introspector.deconstruct(
+        dataset.introspector.deconstruct(
             db=self.db, ds_info=ds_info)
 
         # attach info to a dataset
@@ -607,7 +697,7 @@ class DatasetDatabase(object):
         create_params = {}
         create_params["algorithm"] = self._upload_dataset
         create_params["input_dataset"] = dataset
-        create_params["algorithm_name"] = "upload_dataset"
+        create_params["algorithm_name"] = "dsdb.DatasetDatabase.upload_dataset"
         create_params["algorithm_description"] = "DSDB ingest dataset function"
         create_params["algorithm_version"] = VERSION
         create_params["output_dataset_name"] = dataset.name
@@ -672,6 +762,83 @@ class DatasetDatabase(object):
             db=self.db, ds_info=ds_info)
 
         return Dataset(dataset=obj, ds_info=ds_info)
+
+
+    def preview(self,
+        id: Union[int, None] = None,
+        name: Union[str, None] = None,
+        md5: Union[str, None] = None,
+        sha256: Union[str, None] = None) -> "Dataset":
+
+        # enforce types
+        checks.check_types(id, [int, type(None)])
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(md5, [str, type(None)])
+        checks.check_types(sha256, [str, type(None)])
+
+        # must pass parameter
+        assert any(i is not None for i in [id, name, md5, sha256]), \
+            MISSING_PARAMETER.format(p=[id, name, md5, sha256])
+
+        # get ds_info
+        if id is not None:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["DatasetId", "=", id])
+        elif name is not None:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["Name", "=", name])
+        elif md5 is not None:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["MD5", "=", md5])
+        else:
+            found_ds = self.get_items_from_table(
+                "Dataset", ["SHA256", "=", sha256])
+
+        # found
+        if len(found_ds) == 1:
+            ds_info = found_ds[0]
+            ds_info["OriginDb"] = self
+            ds_info = DatasetInfo(**ds_info)
+
+        # not found
+        elif len(found_ds) == 0:
+            raise ValueError(DATASET_NOT_FOUND.format(kw=locals()))
+
+        # database structure error
+        else:
+            raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
+
+        # get groups
+        groups = self.get_items_from_table(
+            "GroupDataset", ["DatasetId", "=", ds_info.id])
+
+        # get first group
+        iota_groups = self.get_items_from_table(
+            "IotaGroup", ["GroupId", "=", groups[0]["GroupId"]])
+
+        # shape
+        shape = (len(groups), len(iota_groups))
+
+        # keys
+        keys = []
+        for ig in iota_groups:
+            keys.append(self.get_items_from_table(
+                "Iota", ["IotaId", "=", ig["IotaId"]])[0]["Key"])
+
+        # annotations
+        annotation_datasets = self.get_items_from_table(
+            "AnnotationDataset", ["DatasetId", "=", ds_info.id])
+
+        # annotations
+        annotations = []
+        for ad in annotation_datasets:
+            annotations.append(self.get_items_from_table(
+                "Annotation", ["AnnotationId", "=", ad["AnnotationId"]])[0])
+
+        return {"info": ds_info,
+                "shape": shape,
+                "keys": keys,
+                "annotations": annotations}
 
 
     def get_items_from_table(self,
@@ -987,35 +1154,27 @@ class Dataset(object):
         # validate obj
         self.introspector.validate(**kwargs)
 
+        # update hashes
+        self._md5 = tools.get_object_hash(self.ds)
+        self._sha256 = tools.get_object_hash(self.ds, hashlib.sha256)
 
-    def store_files(self,
-        db: Union[orator.DatabaseManager, None] = None,
-        fms: Union[FMSInterface, None] = None, **kwargs):
-        # enforce types
-        checks.check_types(db, [orator.DatabaseManager, type(None)])
-        checks.check_types(fms, [FMSInterface, type(None)])
 
-        # route db
-        if db is None:
-            if self.info is None:
-                raise ValueError(MISSING_PARAMETER.format(p="ds"))
-            else:
-                db = self.info.origin.constructor.db
+    def store_files(self, **kwargs):
+        # enforce data
+        if self.info is None:
+            raise AttributeError(MISSING_DATASET_INFO)
 
-        # route fms
-        if fms is None:
-            if self.info is None:
-                raise ValueError(MISSING_PARAMETER.format(p="fms"))
-            else:
-                fms = self.info.origin.constructor.fms
+        # prep params
+        params = {"db": self.info.origin.constructor.db,
+                  "fms": self.info.origin.constructor.fms,
+                  **kwargs}
 
-        # update dataset
-        if self.info is not None:
-            self.apply(self.introspector.store_files,
-            algorithm_name = "dsdb.Dataset.store_files",
-            output_dataset_name = self.name + " with fms stored files",
-            output_dataset_description = self.description,
-            algorithm_parameters = {"db": db, "fms": fms, **kwargs})
+        # store
+        self.apply(self.introspector.store_files,
+        algorithm_name = "dsdb.Dataset.store_files",
+        output_dataset_name = self.name + " with fms stored files",
+        output_dataset_description = self.description,
+        algorithm_parameters = params)
 
 
     def upload_to(self, database: DatasetDatabase) -> DatasetInfo:

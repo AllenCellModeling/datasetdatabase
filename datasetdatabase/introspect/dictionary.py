@@ -138,7 +138,9 @@ class DictionaryIntrospector(Introspector):
         return func(self.obj[key])
 
 
-def reconstruct(db: orator.DatabaseManager, ds_info: "DatasetInfo") -> dict:
+def reconstruct(db: orator.DatabaseManager,
+    ds_info: "DatasetInfo",
+    in_order: bool = False) -> dict:
     # create group_datasets
     group_datasets = tools.get_items_from_db_table(
         db, "GroupDataset", ["DatasetId", "=", ds_info.id])

@@ -54,7 +54,10 @@ class ProgressBar(object):
 
 
     def update_bar_str(self):
-        complete = self.current / float(self.max)
+        if self.max > 0:
+            complete = self.current / float(self.max)
+        else:
+            complete = 1.0
         self.percent = round(100.0 * complete, 1)
         filled_length = int(round(self.bar_length * complete))
 
