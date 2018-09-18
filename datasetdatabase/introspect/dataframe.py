@@ -266,8 +266,27 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
     # all iota are created at the same time
     created = datetime.now()
 
+    # get and remove label
+    label = str(row.pop("__DSDB_GROUP_LABEL__"))
+
+    # create iota list
+    iota = []
+
+    # generate iota
+    for k, v in row.items():
+        # create iota
+        i = {"Key": k,
+             "Value": pickle.dumps(v),
+             "Created": created}
+
+        # insert iota
+        iota.append(tools.insert_to_db_table(database, "Iota", i))
+
+    # create hash target
+    to_hash = [i["IotaId"] for i in iota]
+
     # create group
-    group = {"GUID": str(uuid.uuid4()),
+    group = {"MD5": tools.get_object_hash(to_hash),
              "Created": created}
 
     # insert group
@@ -276,30 +295,20 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
     # create group_dataset
     group_dataset = {"GroupId": group["GroupId"],
                      "DatasetId": ds_info.id,
-                     "Label": str(row["__DSDB_GROUP_LABEL__"]),
+                     "Label": label,
                      "Created": created}
-
-    # remove label
-    row.pop("__DSDB_GROUP_LABEL__", None)
 
     # insert group_dataset
     group_dataset = tools.insert_to_db_table(
         database, "GroupDataset", group_dataset)
 
-    # generate iota and iota_group
-    for k, v in row.items():
-        # create iota
-        iota = {"Key": k,
-                "Value": pickle.dumps(v),
-                "Created": created}
-
-        # insert iota
-        iota = tools.insert_to_db_table(database, "Iota", iota)
-
+    # generate iota_group joins
+    for i in iota:
         # create iota_group
-        iota_group = {"IotaId": iota["IotaId"],
+        iota_group = {"IotaId": i["IotaId"],
                       "GroupId": group["GroupId"],
                       "Created": created}
+
         # insert iota_group
         iota_group = tools.insert_to_db_table(
             database, "IotaGroup", iota_group)
@@ -363,6 +372,7 @@ def reconstruct(db: orator.DatabaseManager,
     df = pd.DataFrame(rows)
     df = df.sort_values(by="__DSDB_GROUP_LABEL__")
     df = df.drop(labels="__DSDB_GROUP_LABEL__", axis=1)
+    df = df.reset_index(drop=True)
 
     # return dataframe
     return df

@@ -533,7 +533,7 @@ class DatasetDatabase(object):
         if input_dataset is not None:
             # check hash
             found_ds = self.get_items_from_table(
-                "Dataset", ["MD5", "=", input_dataset.md5])
+                "Dataset", ["Name", "=", input_dataset.name])
 
             # found
             if len(found_ds) == 1:
@@ -638,7 +638,7 @@ class DatasetDatabase(object):
 
         # check hash
         found_ds = self.get_items_from_table(
-            "Dataset", ["MD5", "=", dataset.md5])
+            "Dataset", ["Name", "=", dataset.name])
 
         # found
         if len(found_ds) == 1:
@@ -658,8 +658,6 @@ class DatasetDatabase(object):
             ds_info = {"Name": dataset.name,
                        "Description": dataset.description,
                        "Introspector": introspector_module,
-                       "MD5": dataset.md5,
-                       "SHA256": dataset.sha256,
                        "Created": dataset.created}
             ds_info["DatasetId"] = self.db.table("Dataset")\
                 .insert_get_id(ds_info, sequence=("DatasetId"))
@@ -687,11 +685,6 @@ class DatasetDatabase(object):
         # enforce types
         checks.check_types(dataset, Dataset)
 
-        # enforce no change
-        current_hash = tools.get_object_hash(dataset.ds)
-        assert current_hash == dataset.md5, UNKNOWN_DATASET_HASH.format(
-            o=dataset.md5, c=current_hash)
-
         create_params = {}
         create_params["algorithm"] = self._upload_dataset
         create_params["input_dataset"] = dataset
@@ -714,33 +707,23 @@ class DatasetDatabase(object):
 
     def get_dataset(self,
         id: Union[int, None] = None,
-        name: Union[str, None] = None,
-        md5: Union[str, None] = None,
-        sha256: Union[str, None] = None) -> "Dataset":
+        name: Union[str, None] = None) -> "Dataset":
 
         # enforce types
         checks.check_types(id, [int, type(None)])
         checks.check_types(name, [str, type(None)])
-        checks.check_types(md5, [str, type(None)])
-        checks.check_types(sha256, [str, type(None)])
 
         # must pass parameter
-        assert any(i is not None for i in [id, name, md5, sha256]), \
-            MISSING_PARAMETER.format(p=[id, name, md5, sha256])
+        assert any(i is not None for i in [id, name]), \
+            MISSING_PARAMETER.format(p=["id", "name"])
 
         # get ds_info
         if id is not None:
             found_ds = self.get_items_from_table(
                 "Dataset", ["DatasetId", "=", id])
-        elif name is not None:
-            found_ds = self.get_items_from_table(
-                "Dataset", ["Name", "=", name])
-        elif md5 is not None:
-            found_ds = self.get_items_from_table(
-                "Dataset", ["MD5", "=", md5])
         else:
             found_ds = self.get_items_from_table(
-                "Dataset", ["SHA256", "=", sha256])
+                "Dataset", ["Name", "=", name])
 
         # found
         if len(found_ds) == 1:
@@ -764,33 +747,23 @@ class DatasetDatabase(object):
 
     def preview(self,
         id: Union[int, None] = None,
-        name: Union[str, None] = None,
-        md5: Union[str, None] = None,
-        sha256: Union[str, None] = None) -> "Dataset":
+        name: Union[str, None] = None) -> "Dataset":
 
         # enforce types
         checks.check_types(id, [int, type(None)])
         checks.check_types(name, [str, type(None)])
-        checks.check_types(md5, [str, type(None)])
-        checks.check_types(sha256, [str, type(None)])
 
         # must pass parameter
-        assert any(i is not None for i in [id, name, md5, sha256]), \
-            MISSING_PARAMETER.format(p=[id, name, md5, sha256])
+        assert any(i is not None for i in [id, name]), \
+            MISSING_PARAMETER.format(p=["id", "name"])
 
         # get ds_info
         if id is not None:
             found_ds = self.get_items_from_table(
                 "Dataset", ["DatasetId", "=", id])
-        elif name is not None:
-            found_ds = self.get_items_from_table(
-                "Dataset", ["Name", "=", name])
-        elif md5 is not None:
-            found_ds = self.get_items_from_table(
-                "Dataset", ["MD5", "=", md5])
         else:
             found_ds = self.get_items_from_table(
-                "Dataset", ["SHA256", "=", sha256])
+                "Dataset", ["Name", "=", name])
 
         # found
         if len(found_ds) == 1:
@@ -914,8 +887,6 @@ class DatasetInfo(object):
         DatasetId: int,
         Name: Union[str, None],
         Introspector: str,
-        MD5: str,
-        SHA256: str,
         Created: Union[datetime, str],
         OriginDb: DatasetDatabase,
         Description: Union[str, None] = None):
@@ -925,8 +896,6 @@ class DatasetInfo(object):
         checks.check_types(Name, [str, type(None)])
         checks.check_types(Description, [str, type(None)])
         checks.check_types(Introspector, str)
-        checks.check_types(MD5, str)
-        checks.check_types(SHA256, str)
         checks.check_types(Created, [datetime, str])
         checks.check_types(OriginDb, DatasetDatabase)
 
@@ -939,8 +908,6 @@ class DatasetInfo(object):
         self._name = Name
         self._description = Description
         self._introspector = Introspector
-        self._md5 = MD5
-        self._sha256 = SHA256
         self._created = Created
         self._origin = OriginDb
 
@@ -969,16 +936,6 @@ class DatasetInfo(object):
 
 
     @property
-    def md5(self):
-        return self._md5
-
-
-    @property
-    def sha256(self):
-        return self._sha256
-
-
-    @property
     def created(self):
         return self._created
 
@@ -990,7 +947,7 @@ class DatasetInfo(object):
 
     def _validate_info(self):
         found = self.origin.get_items_from_table("Dataset",
-            ["MD5", "=", self.md5])
+            ["Name", "=", self.name])
 
         assert len(found) == 1, INVALID_DS_INFO
 
@@ -1000,8 +957,6 @@ class DatasetInfo(object):
                     "name": self.name,
                     "description": self.description,
                     "introspector": self.introspector,
-                    "md5": self.md5,
-                    "sha256": self.sha256,
                     "created": self.created})
 
 
@@ -1050,10 +1005,6 @@ class Dataset(object):
         # read introspector
         if isinstance(self.introspector, str):
             self._introspector = INTROSPECTOR_MAP[self.introspector](dataset)
-
-        # update hashes
-        self._md5 = tools.get_object_hash(self.ds)
-        self._sha256 = tools.get_object_hash(self.ds, hashlib.sha256)
 
         # unpack based on info
         # name
@@ -1118,16 +1069,6 @@ class Dataset(object):
 
 
     @property
-    def md5(self):
-        return self._md5
-
-
-    @property
-    def sha256(self):
-        return self._sha256
-
-
-    @property
     def annotations(self):
         return self._annotations
 
@@ -1141,8 +1082,6 @@ class Dataset(object):
                  "description": self.description,
                  "introspector": type(self.introspector),
                  "validated": self.validated,
-                 "md5": self.md5,
-                 "sha256": self.sha256,
                  "annotations": self.annotations}
 
         return state
@@ -1151,10 +1090,6 @@ class Dataset(object):
     def validate(self, **kwargs):
         # validate obj
         self.introspector.validate(**kwargs)
-
-        # update hashes
-        self._md5 = tools.get_object_hash(self.ds)
-        self._sha256 = tools.get_object_hash(self.ds, hashlib.sha256)
 
 
     def store_files(self, **kwargs):
@@ -1219,7 +1154,7 @@ class Dataset(object):
 
         # ensure dataset is in database
         found_ds = database.get_items_from_table(
-            "Dataset", ["MD5", "=", self.md5])
+            "Dataset", ["Name", "=", self.name])
 
         # not found
         if len(found_ds) == 0:
@@ -1257,8 +1192,6 @@ class Dataset(object):
         self.name = ds.name
         self.description = ds.description
         self._annotations = ds._annotations
-        self._md5 = ds._md5
-        self._sha256 = ds._sha256
 
 
     @property

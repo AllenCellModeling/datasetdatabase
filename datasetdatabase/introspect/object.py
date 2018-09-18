@@ -56,8 +56,19 @@ class ObjectIntrospector(Introspector):
         # all iota are created at the same time
         created = datetime.now()
 
+        # create iota
+        i = {"Key": "obj",
+             "Value": pickle.dumps(self.obj),
+             "Created": created}
+
+        # insert iota
+        iota = tools.insert_to_db_table(db, "Iota", i)
+
+        # create hash target
+        to_hash = [i["IotaId"] for i in iota]
+
         # create group
-        group = {"GUID": str(uuid.uuid4()),
+        group = {"MD5": tools.get_object_hash(to_hash),
                  "Created": created}
 
         # insert group
@@ -72,14 +83,6 @@ class ObjectIntrospector(Introspector):
         # insert group_dataset
         group_dataset = tools.insert_to_db_table(
             db, "GroupDataset", group_dataset)
-
-        # create iota
-        iota = {"Key": "obj",
-                "Value": pickle.dumps(self.obj),
-                "Created": created}
-
-        # insert iota
-        iota = tools.insert_to_db_table(db, "Iota", iota)
 
         # create iota_group
         iota_group = {"IotaId": iota["IotaId"],

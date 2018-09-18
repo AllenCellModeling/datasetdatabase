@@ -43,7 +43,7 @@ def create_Group(schema: orator.Schema):
     if not schema.has_table("Group"):
         with schema.create("Group") as table:
             table.increments("GroupId")
-            table.string("GUID")
+            table.string("MD5").unique()
             table.datetime("Created")
 
 
@@ -78,8 +78,6 @@ def create_Dataset(schema: orator.Schema):
             table.string("Name").unique()
             table.text("Description").nullable()
             table.string("Introspector")
-            table.string("MD5").unique()
-            table.string("SHA256").unique()
             table.datetime("Created")
 
 

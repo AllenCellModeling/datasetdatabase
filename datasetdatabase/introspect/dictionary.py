@@ -56,8 +56,30 @@ class DictionaryIntrospector(Introspector):
         # all iota are created at the same time
         created = datetime.now()
 
+        # create iota list
+        iota = []
+
+        # create progress bar
+        bar = ProgressBar(len(self.obj.keys()) * 2)
+
+        # generate iota
+        for k, v in self.obj.items():
+            # create iota
+            i = {"Key": k,
+                 "Value": pickle.dumps(v),
+                 "Created": created}
+
+            # insert iota
+            iota.append(tools.insert_to_db_table(db, "Iota", i))
+
+            # update progress
+            bar.increment()
+
+        # create hash target
+        to_hash = [i["IotaId"] for i in iota]
+
         # create group
-        group = {"GUID": str(uuid.uuid4()),
+        group = {"MD5": tools.get_object_hash(to_hash),
                  "Created": created}
 
         # insert group
@@ -73,19 +95,10 @@ class DictionaryIntrospector(Introspector):
         group_dataset = tools.insert_to_db_table(
             db, "GroupDataset", group_dataset)
 
-        # create items
-        bar = ProgressBar(len(self.obj.keys()))
-        for k, v in self.obj.items():
-            # create iota
-            iota = {"Key": k,
-                    "Value": pickle.dumps(v),
-                    "Created": created}
-
-            # insert iota
-            iota = tools.insert_to_db_table(db, "Iota", iota)
-
+        # generate iota_group joins
+        for i in iota:
             # create iota_group
-            iota_group = {"IotaId": iota["IotaId"],
+            iota_group = {"IotaId": i["IotaId"],
                           "GroupId": group["GroupId"],
                           "Created": created}
 
