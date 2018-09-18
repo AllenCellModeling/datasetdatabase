@@ -57,8 +57,7 @@ class DictionaryIntrospector(Introspector):
         created = datetime.now()
 
         # create group
-        group = {"Label": str(uuid.uuid4()),
-                 "Created": created}
+        group = {"Created": created}
 
         # insert group
         group = tools.insert_to_db_table(db, "Group", group)
@@ -66,6 +65,7 @@ class DictionaryIntrospector(Introspector):
         # create group_dataset
         group_dataset = {"GroupId": group["GroupId"],
                          "DatasetId": ds_info.id,
+                         "Label": str(uuid.uuid4()),
                          "Created": created}
 
         # insert group_dataset

@@ -271,8 +271,7 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
     created = datetime.now()
 
     # create group
-    group = {"Label": str(row["__DSDB_GROUP_LABEL__"]),
-             "Created": created}
+    group = {"Created": created}
 
     # remove label
     row.pop("__DSDB_GROUP_LABEL__", None)
@@ -283,6 +282,7 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
     # create group_dataset
     group_dataset = {"GroupId": group["GroupId"],
                      "DatasetId": ds_info.id,
+                     "Label": str(row["__DSDB_GROUP_LABEL__"]),
                      "Created": created}
 
     # insert group_dataset
@@ -317,9 +317,7 @@ def _reconstruct_group(group_dataset, database, progress_bar):
         database, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
 
     # get label
-    group = tools.get_items_from_db_table(
-        database, "Group", ["GroupId", "=", group_dataset["GroupId"]])
-    label = int(group[0]["Label"])
+    label = int(group_dataset["Label"])
 
     # create group
     group = {}

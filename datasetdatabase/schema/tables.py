@@ -43,7 +43,6 @@ def create_Group(schema: orator.Schema):
     if not schema.has_table("Group"):
         with schema.create("Group") as table:
             table.increments("GroupId")
-            table.string("Label")
             table.datetime("Created")
 
 
@@ -93,8 +92,9 @@ def create_GroupDataset(schema: orator.Schema):
             table.increments("GroupDatasetId")
             table.integer("GroupId").unsigned()
             table.integer("DatasetId").unsigned()
+            table.string("Label")
             table.datetime("Created")
-            table.unique(["GroupId", "DatasetId"])
+            table.unique(["GroupId", "DatasetId", "Label"])
             table.foreign("GroupId") \
                  .references("GroupId") \
                  .on("Group")
