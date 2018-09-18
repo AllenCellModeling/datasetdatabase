@@ -21,6 +21,7 @@ from ...utils import tools
 # globals
 STORAGE_USER = "dsdb_storage"
 CONNECTION_OPTIONS = {"user": STORAGE_USER, "storage_location": None}
+STORAGE_LOCATION_IS_NOT_DIR = "Storage location must be an existing directory."
 
 
 class QuiltFMS(FMSInterface):
@@ -45,6 +46,11 @@ class QuiltFMS(FMSInterface):
     @property
     def table_name(self):
         return "File"
+
+
+    @property
+    def storage_location(self):
+        return self._storage_location
 
 
     def create_File(self, schema: orator.Schema):
@@ -72,8 +78,13 @@ class QuiltFMS(FMSInterface):
 
         # update quilt store
         if storage_location is not None:
-            self.storage_location = storage_location
-            checks.check_file_exists(self.storage_location)
+            # resolve path
+            storage_location = pathlib.Path(storage_location)
+            storage_location = storage_location.expanduser()
+            storage_location = storage_location.resolve()
+            assert storage_location.is_dir(), STORAGE_LOCATION_IS_NOT_DIR
+            assert storage_location.exists(), STORAGE_LOCATION_IS_NOT_DIR
+            self._storage_location = storage_location
             os.environ["QUILT_PRIMARY_PACKAGE_DIR"] = str(self.storage_location)
             os.environ["QUILT_PACKAGE_DIRS"] = str(self.storage_location)
 
@@ -123,7 +134,7 @@ class QuiltFMS(FMSInterface):
         db: orator.DatabaseManager,
         filepath: Union[str, pathlib.Path],
         metadata: Union[str, dict, None] = None) -> dict:
-        
+
         # enforce types
         checks.check_types(db, orator.DatabaseManager)
         checks.check_types(filepath, [str, pathlib.Path])
