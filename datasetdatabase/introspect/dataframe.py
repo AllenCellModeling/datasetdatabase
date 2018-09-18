@@ -244,7 +244,8 @@ class DataFrameIntrospector(Introspector):
             n_threads = os.cpu_count()
 
         # insert row labels
-        rows = self.obj.apply(lambda row: _insert_row_label(row), axis=1)
+        indices = pd.Series(range(len(self.obj)))
+        rows = self.obj.assign(__DSDB_GROUP_LABEL__=indices)
 
         # pre build rows
         rows = rows.to_dict("records")
@@ -261,20 +262,12 @@ class DataFrameIntrospector(Introspector):
         return package
 
 
-def _insert_row_label(row):
-    row["__DSDB_GROUP_LABEL__"] = row.name
-    return row
-
-
 def _deconstruct_Group(row, database, ds_info, progress_bar):
     # all iota are created at the same time
     created = datetime.now()
 
     # create group
     group = {"Created": created}
-
-    # remove label
-    row.pop("__DSDB_GROUP_LABEL__", None)
 
     # insert group
     group = tools.insert_to_db_table(database, "Group", group)
@@ -284,6 +277,9 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
                      "DatasetId": ds_info.id,
                      "Label": str(row["__DSDB_GROUP_LABEL__"]),
                      "Created": created}
+
+    # remove label
+    row.pop("__DSDB_GROUP_LABEL__", None)
 
     # insert group_dataset
     group_dataset = tools.insert_to_db_table(
