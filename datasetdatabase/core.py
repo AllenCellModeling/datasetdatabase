@@ -1105,6 +1105,7 @@ class Dataset(object):
         # store
         self.apply(self.introspector.store_files,
         algorithm_name = "dsdb.Dataset.store_files",
+        algorithm_version = VERSION,
         output_dataset_name = self.name + " with fms stored files",
         output_dataset_description = self.description,
         algorithm_parameters = params)
