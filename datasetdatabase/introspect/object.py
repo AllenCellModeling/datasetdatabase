@@ -57,7 +57,8 @@ class ObjectIntrospector(Introspector):
         created = datetime.now()
 
         # create group
-        group = {"Created": created}
+        group = {"GUID": str(uuid.uuid4()),
+                 "Created": created}
 
         # insert group
         group = tools.insert_to_db_table(db, "Group", group)

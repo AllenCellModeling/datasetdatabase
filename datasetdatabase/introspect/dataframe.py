@@ -267,7 +267,8 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
     created = datetime.now()
 
     # create group
-    group = {"Created": created}
+    group = {"GUID": str(uuid.uuid4()),
+             "Created": created}
 
     # insert group
     group = tools.insert_to_db_table(database, "Group", group)
@@ -313,7 +314,7 @@ def _reconstruct_group(group_dataset, database, progress_bar):
         database, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
 
     # get label
-    label = int(group_dataset["Label"])
+    label = int(float(group_dataset["Label"]))
 
     # create group
     group = {}

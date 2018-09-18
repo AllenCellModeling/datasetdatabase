@@ -43,6 +43,7 @@ def create_Group(schema: orator.Schema):
     if not schema.has_table("Group"):
         with schema.create("Group") as table:
             table.increments("GroupId")
+            table.string("GUID")
             table.datetime("Created")
 
 
