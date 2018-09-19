@@ -17,9 +17,6 @@ from ..schema.filemanagers import FMSInterface
 from ..utils import checks, tools, ProgressBar
 from .introspector import Introspector
 
-# globals
-DATASET_MUST_BE_UPLOADED = "Dataset must be uploaded prior to storing files."
-
 
 class DataFrameIntrospector(Introspector):
     """
@@ -175,12 +172,16 @@ class DataFrameIntrospector(Introspector):
             print("Checking files exist...")
             self._validate_dataset_files()
 
-            # update validated
-            self._validated["files"] = {k: True for k in self.filepath_columns}
+            if not isinstance(self.validated, bool):
+                # update validated
+                self._validated["files"] = {
+                    k: True for k in self.filepath_columns}
 
         # no columns passed
         else:
-            self._validated["files"] = False
+            if not isinstance(self.validated, bool):
+                # update validated
+                self._validated["files"] = False
 
 
     def store_files(self,
@@ -195,7 +196,7 @@ class DataFrameIntrospector(Introspector):
         checks.check_types(filepath_columns, [str, list, type(None)])
 
         # enforce exists
-        assert self.validated, DATASET_MUST_BE_UPLOADED
+        self.enforce_files_exist_from_columns(filepath_columns)
 
         # update filepaths to storage files
         if self.filepath_columns is not None:

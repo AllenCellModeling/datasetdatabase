@@ -215,7 +215,6 @@ class QuiltFMS(FMSInterface):
 
         # create quilt node
         full_package_name = self.storage_user + "/" + package_name
-        print(full_package_name, file=sys.stderr)
         quilt.build(full_package_name, str(temp_write_loc))
 
         # remove the temp file
