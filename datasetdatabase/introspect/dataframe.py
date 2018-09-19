@@ -17,6 +17,9 @@ from ..schema.filemanagers import FMSInterface
 from ..utils import checks, tools, ProgressBar
 from .introspector import Introspector
 
+# globals
+DATASET_MUST_BE_UPLOADED = "Dataset must be uploaded prior to storing files."
+
 
 class DataFrameIntrospector(Introspector):
     """
@@ -192,7 +195,7 @@ class DataFrameIntrospector(Introspector):
         checks.check_types(filepath_columns, [str, list, type(None)])
 
         # enforce exists
-        self.enforce_files_exist_from_columns(filepath_columns)
+        assert self.validated, DATASET_MUST_BE_UPLOADED
 
         # update filepaths to storage files
         if self.filepath_columns is not None:
