@@ -63,7 +63,7 @@ class QuiltFMS(FMSInterface):
             with schema.create("File") as table:
                 table.string("FileId")
                 table.string("OriginalFilepath")
-                table.string("FileType").nullable()
+                table.string("Filetype").nullable()
                 table.string("ReadPath")
                 table.string("MD5").unique()
                 table.string("SHA256").unique()

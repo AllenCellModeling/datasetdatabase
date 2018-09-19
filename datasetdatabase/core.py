@@ -317,14 +317,24 @@ class DatasetDatabase(object):
         user: Union[str, None] = None,
         constructor: Union[DatabaseConstructor, None] = None,
         build: bool = False,
-        recent_size: int = 5):
+        recent_size: int = 5,
+        processing_limit: Union[int, None] = None):
 
         # enforce types
         checks.check_types(config,
             [DatabaseConfig, str, pathlib.Path, dict, type(None)])
         checks.check_types(user, [str, type(None)])
         checks.check_types(constructor, [DatabaseConstructor, type(None)])
+        checks.check_types(build, bool)
         checks.check_types(recent_size, int)
+        checks.check_types(processing_limit, [int, type(None)])
+
+        # handle processing limit
+        if processing_limit is None:
+            processing_limit = os.cpu_count()
+
+        # update os environ
+        os.environ["DSDB_PROCESS_LIMIT"] = str(processing_limit)
 
         # assume local
         if config is None:
@@ -1250,7 +1260,9 @@ class Dataset(object):
         to_save = {"obj": self.ds,
                    "id": self.info.id,
                    "config": self.info.origin.config,
-                   "user": self.info.origin.user}
+                   "user": self.info.origin.user,
+                   "name": self.name,
+                   "description": self.description}
 
         tools.write_pickle(to_save, path)
 
