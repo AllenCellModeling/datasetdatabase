@@ -11,6 +11,7 @@ import quilt
 import yaml
 import json
 import uuid
+import sys
 import os
 
 # self
@@ -194,6 +195,11 @@ class QuiltFMS(FMSInterface):
         checks.check_types(package_name, str)
         checks.check_file_exists(filepath)
 
+        # convert types
+        filepath = pathlib.Path(filepath)
+        filepath = filepath.expanduser()
+        filepath = filepath.resolve()
+
         # construct manifest
         load = {}
         load["file"] = str(filepath)
@@ -209,6 +215,7 @@ class QuiltFMS(FMSInterface):
 
         # create quilt node
         full_package_name = self.storage_user + "/" + package_name
+        print(full_package_name, file=sys.stderr)
         quilt.build(full_package_name, str(temp_write_loc))
 
         # remove the temp file

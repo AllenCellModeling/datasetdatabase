@@ -739,6 +739,7 @@ class DatasetDatabase(object):
         else:
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
+        # reconstruct object
         obj = RECONSTRUCTOR_MAP[ds_info.introspector](
             db=self.db, ds_info=ds_info)
 
