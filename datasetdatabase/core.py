@@ -245,6 +245,34 @@ class DatabaseConstructor(object):
 
 
     def prepare_connection(self):
+        """
+        Prepare a database connection by asserting required attributes are
+        present in the config passed. If the database link is a file, enforce
+        that the file and all parent directories exist.
+
+        Example
+        ==========
+        ```
+        >>> good_config.prepare_connection()
+
+
+        >>> bad_config.prepare_connection()
+        AssertionError: "Local databases must have suffix '.db'"
+
+        ```
+
+        Parameters
+        ==========
+
+        Returns
+        ==========
+
+        Errors
+        ==========
+        AssertionError
+            The local database link is not the appropriate file type (.db).
+
+        """
         # convert database link and enforce exists
         if self.config.config["driver"] == "sqlite":
             link = self.config.config["database"]
@@ -255,6 +283,28 @@ class DatabaseConstructor(object):
 
 
     def create_schema(self):
+        """
+        Create all the tables referenced by the SchemaVersion that was passed
+        in the DatabaseConfig constructor and fms attachment.
+
+        Example
+        ==========
+        ```
+        >>> constructor.create_schema()
+
+        ```
+
+        Parameters
+        ==========
+
+        Returns
+        ==========
+
+        Errors
+        ==========
+
+        """
+
         # create all tables in version
         for tbl, func in self.schema.tables.items():
             func(self.orator_schema)
@@ -269,6 +319,36 @@ class DatabaseConstructor(object):
 
 
     def build(self):
+        """
+        Connect to a database and build the tables found in the SchemaVersion
+        passed to the DatabaseConstructor initialization.
+
+        This is mainly a wrapper around the prepare_connection and create_schema
+        functions that additionally returns the orator.DatabaseManager object
+        created.
+
+        Example
+        ==========
+        ```
+        >>> constructor.build()
+
+        ```
+
+        Parameters
+        ==========
+
+        Returns
+        ==========
+        db: orator.DatabaseManager
+            A constructed database manager object that can be used to fully
+            interact with the database, but additionally, all the tables have
+            been stored in the constructor.tables attribute.
+
+        Errors
+        ==========
+
+        """
+
         # run preparation steps
         self.prepare_connection()
 
@@ -279,6 +359,31 @@ class DatabaseConstructor(object):
 
 
     def _drop_schema(self):
+        """
+        Teardown the entire database connected to this DatabaseConstructor.
+
+        From the original SchemaVersion passed, the tables list is reversed for
+        teardown precedure. From there all tables are dropped in full one at a
+        time.
+
+        Example
+        ==========
+        ```
+        >>> constructor._drop_schema()
+
+        ```
+
+        Parameters
+        ==========
+
+        Returns
+        ==========
+
+        Errors
+        ==========
+
+        """
+
         # get drop order
         drop_order = list(self.schema.tables)
         drop_order.reverse()
@@ -289,6 +394,32 @@ class DatabaseConstructor(object):
 
 
     def get_tables(self):
+        """
+        In the case that a database is already fully constructed, a get_tables
+        operation should be run so that the table map is fully up-to-date
+        without overwriting or constructing useless tables.
+
+        Example
+        ==========
+        ```
+        >>> constructor.get_tables()
+
+        ```
+
+        Parameters
+        ==========
+
+        Returns
+        ==========
+        db: orator.DatabaseManager
+            A constructed database manager object that can be used to fully
+            interact with the database, but additionally, all the tables have
+            been stored in the constructor.tables attribute.
+
+        Errors
+        ==========
+
+        """
         # run preparation steps
         self.prepare_connection()
 
@@ -412,7 +543,7 @@ class DatasetDatabase(object):
             return self._insert_to_table("User",
                 {"Name": user,
                  "Description": description,
-                 "Created": datetime.now()})
+                 "Created": datetime.utcnow()})
 
         # found
         if len(user_info) == 1:
@@ -495,7 +626,7 @@ class DatasetDatabase(object):
                 {"Name": name,
                  "Description": description,
                  "Version": version,
-                 "Created": datetime.now()})
+                 "Created": datetime.utcnow()})
             return alg_info
 
         # database structure error
@@ -543,7 +674,8 @@ class DatasetDatabase(object):
         if input_dataset is not None:
             # check hash
             found_ds = self.get_items_from_table(
-                "Dataset", ["Name", "=", input_dataset.name])
+                "Dataset", [["MD5", "=", input_dataset.md5],
+                            ["SHA256", "=", input_dataset.sha256]])
 
             # found
             if len(found_ds) == 1:
@@ -594,15 +726,19 @@ class DatasetDatabase(object):
         if algorithm_name != "dsdb.DatasetDatabase.upload_dataset":
             print("Dataset processing has begun...")
 
-        begin = datetime.now()
+        begin = datetime.utcnow()
 
         # run
         output = algorithm(input, **algorithm_parameters)
 
         # end
-        end = datetime.now()
+        end = datetime.utcnow()
         if algorithm_name != "dsdb.DatasetDatabase.upload_dataset":
             print("Dataset processing has ended...")
+
+        # handle returned dataset
+        if isinstance(output, Dataset):
+            output = output.ds
 
         # ingest output
         output = self._create_dataset(output,
@@ -648,7 +784,8 @@ class DatasetDatabase(object):
 
         # check hash
         found_ds = self.get_items_from_table(
-            "Dataset", ["Name", "=", dataset.name])
+            "Dataset", [["MD5", "=", dataset.md5],
+                        ["SHA256", "=", dataset.sha256]])
 
         # found
         if len(found_ds) == 1:
@@ -668,6 +805,8 @@ class DatasetDatabase(object):
             ds_info = {"Name": dataset.name,
                        "Description": dataset.description,
                        "Introspector": introspector_module,
+                       "MD5": dataset.md5,
+                       "SHA256": dataset.sha256,
                        "Created": dataset.created}
             ds_info["DatasetId"] = self.db.table("Dataset")\
                 .insert_get_id(ds_info, sequence=("DatasetId"))
@@ -695,6 +834,13 @@ class DatasetDatabase(object):
         # enforce types
         checks.check_types(dataset, Dataset)
 
+        # enforce no change since create
+        curr_md5 = dataset.introspector.get_object_hash()
+        md5_match = curr_md5 == dataset.md5
+        assert md5_match, UNKNOWN_DATASET_HASH.format(
+            o=dataset.md5, c=curr_md5)
+
+        # create basic params
         create_params = {}
         create_params["algorithm"] = self._upload_dataset
         create_params["input_dataset"] = dataset
@@ -704,6 +850,7 @@ class DatasetDatabase(object):
         create_params["output_dataset_name"] = dataset.name
         create_params["output_dataset_description"] = dataset.description
 
+        # update introspector after create
         current_introspector = dataset.introspector
         current_annotations = dataset.annotations
         uploaded = self.process(**create_params)
@@ -898,6 +1045,8 @@ class DatasetInfo(object):
         DatasetId: int,
         Name: Union[str, None],
         Introspector: str,
+        MD5: str,
+        SHA256: str,
         Created: Union[datetime, str],
         OriginDb: DatasetDatabase,
         Description: Union[str, None] = None):
@@ -907,6 +1056,8 @@ class DatasetInfo(object):
         checks.check_types(Name, [str, type(None)])
         checks.check_types(Description, [str, type(None)])
         checks.check_types(Introspector, str)
+        checks.check_types(MD5, str)
+        checks.check_types(SHA256, str)
         checks.check_types(Created, [datetime, str])
         checks.check_types(OriginDb, DatasetDatabase)
 
@@ -919,6 +1070,8 @@ class DatasetInfo(object):
         self._name = Name
         self._description = Description
         self._introspector = Introspector
+        self._md5 = MD5
+        self._sha256 = SHA256
         self._created = Created
         self._origin = OriginDb
 
@@ -947,6 +1100,16 @@ class DatasetInfo(object):
 
 
     @property
+    def md5(self):
+        return self._md5
+
+
+    @property
+    def sha256(self):
+        return self._sha256
+
+
+    @property
     def created(self):
         return self._created
 
@@ -958,7 +1121,8 @@ class DatasetInfo(object):
 
     def _validate_info(self):
         found = self.origin.get_items_from_table("Dataset",
-            ["Name", "=", self.name])
+            [["MD5", "=", self.md5],
+             ["SHA256", "=", self.sha256]])
 
         assert len(found) == 1, INVALID_DS_INFO
 
@@ -1017,6 +1181,10 @@ class Dataset(object):
         if isinstance(self.introspector, str):
             self._introspector = INTROSPECTOR_MAP[self.introspector](dataset)
 
+        # update hashes
+        self._md5 = self.introspector.get_object_hash()
+        self._sha256 = self.introspector.get_object_hash(hashlib.sha256)
+
         # unpack based on info
         # name
         if name is None:
@@ -1046,7 +1214,7 @@ class Dataset(object):
 
         # created
         if self.info is None:
-            self.created = datetime.now()
+            self.created = datetime.utcnow()
         else:
             self.created = self.info.created
 
@@ -1080,6 +1248,16 @@ class Dataset(object):
 
 
     @property
+    def md5(self):
+        return self._md5
+
+
+    @property
+    def sha256(self):
+        return self._sha256
+
+
+    @property
     def annotations(self):
         return self._annotations
 
@@ -1092,6 +1270,8 @@ class Dataset(object):
                  "name": self.name,
                  "description": self.description,
                  "introspector": type(self.introspector),
+                 "md5": self.md5,
+                 "sha256": self.sha256,
                  "validated": self.validated,
                  "annotations": self.annotations}
 
@@ -1101,6 +1281,10 @@ class Dataset(object):
     def validate(self, **kwargs):
         # validate obj
         self.introspector.validate(**kwargs)
+
+        # update hashes
+        self._md5 = self.introspector.get_object_hash()
+        self._sha256 = self.introspector.get_object_hash(hashlib.sha256)
 
 
     def store_files(self, **kwargs):
@@ -1166,7 +1350,8 @@ class Dataset(object):
 
         # ensure dataset is in database
         found_ds = database.get_items_from_table(
-            "Dataset", ["Name", "=", self.name])
+            "Dataset", [["MD5", "=", self.md5],
+                        ["SHA256", "=", self.sha256]])
 
         # not found
         if len(found_ds) == 0:
@@ -1199,11 +1384,13 @@ class Dataset(object):
         checks.check_types(ds, Dataset)
 
         # reassign self
-        self._info = ds._info
-        self._introspector = ds._introspector
+        self._info = ds.info
+        self._introspector = ds.introspector
         self.name = ds.name
         self.description = ds.description
-        self._annotations = ds._annotations
+        self._annotations = ds.annotations
+        self._md5 = ds.md5
+        self._sha256 = ds.md5
 
 
     @property
@@ -1230,7 +1417,7 @@ class Dataset(object):
         self._annotations.append(
             {"Value": annotation,
              "UserId": self.info.origin.user_info["UserId"],
-             "Created": datetime.now()})
+             "Created": datetime.utcnow()})
 
         # send update is possible
         if self.info is not None:
@@ -1245,7 +1432,7 @@ class Dataset(object):
                 self.info.origin._insert_to_table("AnnotationDataset",
                     {"AnnotationId": anno_info["AnnotationId"],
                      "DatasetId": self.info.id,
-                     "Created": datetime.now()})
+                     "Created": datetime.utcnow()})
 
 
     def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:
@@ -1305,6 +1492,7 @@ def _read_dataset(path: pathlib.Path) -> Dataset:
 
 EXTENSION_MAP = {".csv": pd_read_csv,
                  ".dataset": _read_dataset}
+
 
 def read_dataset(path: Union[str, pathlib.Path]):
     # enforce types

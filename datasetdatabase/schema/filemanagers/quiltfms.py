@@ -179,7 +179,7 @@ class QuiltFMS(FMSInterface):
             "MD5": md5,
             "SHA256": sha256,
             "Metadata": metadata,
-            "Created": datetime.now()}
+            "Created": datetime.utcnow()}
 
         # insert
         file_id = db.table("File").insert(file_info)

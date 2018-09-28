@@ -4,6 +4,7 @@
 from typing import Dict, List, Union
 from datetime import datetime
 import _pickle as pickle
+import hashlib
 import orator
 import types
 import uuid
@@ -38,6 +39,16 @@ class DictionaryIntrospector(Introspector):
         return self._validated
 
 
+    def get_object_hash(self, alg=hashlib.md5):
+        barray = []
+
+        for key, value in self.obj.items():
+            pair = {key: value}
+            barray.append(pickle.dumps(pair))
+
+        return tools.get_object_hash(barray, alg=alg)
+
+
     def validate(self,
         item_validation_map: Union[None,
             Dict[str, Union[types.ModuleType, types.FunctionType]]] = None):
@@ -54,7 +65,7 @@ class DictionaryIntrospector(Introspector):
 
     def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
         # all iota are created at the same time
-        created = datetime.now()
+        created = datetime.utcnow()
 
         # create iota list
         iota = []

@@ -7,9 +7,9 @@ from datetime import datetime
 from functools import partial
 import _pickle as pickle
 import pandas as pd
+import hashlib
 import orator
 import types
-import uuid
 import os
 
 # self
@@ -43,6 +43,16 @@ class DataFrameIntrospector(Introspector):
     @property
     def validated(self):
         return self._validated
+
+
+    def get_object_hash(self, alg=hashlib.md5):
+        barray = []
+
+        for i, row in self.obj.iterrows():
+            for key, val in row.items():
+                barray.append(pickle.dumps({key: val}))
+
+        return tools.get_object_hash(barray, alg=alg)
 
 
     def _format_dataset(self, type_map = None):
@@ -268,7 +278,7 @@ class DataFrameIntrospector(Introspector):
 
 def _deconstruct_Group(row, database, ds_info, progress_bar):
     # all iota are created at the same time
-    created = datetime.now()
+    created = datetime.utcnow()
 
     # get and remove label
     label = str(row.pop("__DSDB_GROUP_LABEL__"))

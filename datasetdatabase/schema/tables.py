@@ -78,6 +78,8 @@ def create_Dataset(schema: orator.Schema):
             table.string("Name").unique()
             table.text("Description").nullable()
             table.string("Introspector")
+            table.string("MD5").unique()
+            table.string("SHA256").unique()
             table.datetime("Created")
 
 
