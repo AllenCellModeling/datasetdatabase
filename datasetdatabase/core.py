@@ -273,6 +273,7 @@ class DatabaseConstructor(object):
             The local database link is not the appropriate file type (.db).
 
         """
+
         # convert database link and enforce exists
         if self.config.config["driver"] == "sqlite":
             link = self.config.config["database"]
@@ -420,6 +421,7 @@ class DatabaseConstructor(object):
         ==========
 
         """
+
         # run preparation steps
         self.prepare_connection()
 
@@ -443,13 +445,75 @@ class DatabaseConstructor(object):
 
 
 class DatasetDatabase(object):
+    """
+    DatasetDatabase is the primary object you will use to do large scale
+    interactions with the database. More common interactions are largely
+    handled by the Dataset object however some operations can be focused or
+    targeted specifically at a specific database. Additionally, there are many
+    admin tools and features on the DatasetDatabase object compared to the
+    Dataset object.
+    """
+
     def __init__(self,
-        config: Union[DatabaseConfig, str, pathlib.Path, dict, None] = None,
+        config: Union[DatabaseConfig, str,
+            pathlib.Path, Dict[str: str], None] = None,
         user: Union[str, None] = None,
         constructor: Union[DatabaseConstructor, None] = None,
         build: bool = False,
         recent_size: int = 5,
         processing_limit: Union[int, None] = None):
+        """
+        Create a DatasetDatabase.
+
+        A DatasetDatabase is an object you can create to both initialize a
+        connection to an orator.DatabaseManager object but additional carry out
+        many of the task that this package was created for such as ingestion,
+        retrieval, search, etc.
+
+        Example
+        ==========
+        ```
+        >>> DatasetDatabase(config="/path/to/valid/config.json")
+        Recent Datasets:
+        ------------------------------------------------------------------------
+
+        >>> DatasetDatabase(config="/path/to/invalid/config.json")
+        AssertionError: "Config must have ('driver', 'database')."
+
+        ```
+
+        Parameters
+        ==========
+        config: DatabaseConfig, str, pathlib.Path, dict, None = None
+            An already created DatabaseConfig, or either a str, pathlib.Path,
+            that when read, or dictionary, contains the required attributes to
+            construct a DatabaseConfig. If None provided, a local database
+            connection is created.
+        user: str, None = None
+            What is the user name you would like to connect with. If None
+            provided, the os system user is used.
+        constructor: DatabaseConstructor, None = None
+            A specific database constructor that will either build the database
+            schema or retrieve the database schema. If None is provided, one is
+            created by initializing a new one and passing the DatabaseConfig,
+            passed or created.
+        build: bool = False
+            Should the constructor build or get the schema from the database.
+        recent_size: int = 5
+            How many items should be returned by any of the recent calls.
+        processing_limit: int, None = None
+            How many processes should the system max out at when ingesting or
+            getting a dataset. If None provided, os.cpu_count() is used as
+            default.
+
+        Returns
+        ==========
+        self
+
+        Errors
+        ==========
+
+        """
 
         # enforce types
         checks.check_types(config,
@@ -521,6 +585,45 @@ class DatasetDatabase(object):
     def get_or_create_user(self,
         user: Union[str, None] = None,
         description: Union[str, None] = None) -> Dict[str, GENERIC_TYPES]:
+        """
+        Get or create a user in the database. This function is largely a
+        wrapper around the insert to table functionality in that it gets or
+        inserts whichever user and description is passed but additionally
+        updates the user and user_info attributes of the DatasetDatabase object.
+
+        Example
+        ==========
+        ```
+        >>> db.get_or_create_user("jacksonb")
+        {"UserId": 1,
+         "Name": "jacksonb",
+         "Description": None,
+         "Created": 2018-09-28 16:39:09}
+
+        ```
+
+        Parameters
+        ==========
+        user: str, None = None
+            What is the user name of the person you want to add to the database.
+            If None provided, the user is determined by db.user.
+        description: str, None = None
+            What is the description of the person you want to add to the
+            database. If None provided, no description is given.
+
+        Returns
+        ==========
+        user_info: dict
+            A dictionary of the row found or created detailing the user.
+
+        Errors
+        ==========
+        ValueError
+            Too many rows returned from the database when expected only one or
+            zero rows returned. This indicates something is drastically wrong
+            with the database.
+
+        """
 
         # enforce types
         checks.check_types(user, [str, type(None)])
@@ -540,14 +643,18 @@ class DatasetDatabase(object):
 
         # not found
         if len(user_info) == 0:
-            return self._insert_to_table("User",
+            user_info = self._insert_to_table("User",
                 {"Name": user,
                  "Description": description,
                  "Created": datetime.utcnow()})
 
+            self._user_info = user_info
+            return self.user_info
+
         # found
         if len(user_info) == 1:
-            return user_info[0]
+            self._user_info = user_info[0]
+            return self.user_info
 
         # database structure error
         raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
@@ -558,6 +665,62 @@ class DatasetDatabase(object):
         name: Union[str, None] = None,
         description: Union[str, None] = None,
         version: Union[str, None] = None) -> Dict[str, GENERIC_TYPES]:
+        """
+        Get or create an algorithm in the database. This function is largely a
+        wrapper around the insert to table functionality in that it gets or
+        inserts whichever algorithm name, description, and version is passed
+        but additionally if none are passed tried to detect or create the
+        parameters.
+
+        Example
+        ==========
+        ```
+        >>> def hello_world():
+                print("hello world")
+        >>> # in a git repo
+        >>> db.get_or_create_algorithm(hello_world)
+        {"AlgorithmId": 2,
+         "Name": "hello_world",
+         "Description": "originally created by jacksonb",
+         "Version": "akljsdf7asdfhkjasdf897sd87aa",
+         "Created": 2018-09-28 16:46:32}
+
+        >>> # out of a git repo
+        >>> db.get_or_create_algorithm(hello_world)
+        ValueError: Could not determine version of algorithm.
+
+        ```
+
+        Parameters
+        ==========
+        algorithm: types.MethodType, types.FunctionType
+            Any python method of function that you want to use in processing a
+            dataset.
+        name: str, None = None
+            A name for the algorithm as it should be stored in the database. If
+            None provided, the name is stored as the function name that was
+            passed.
+        description: str, None = None
+            A description for the algorithm as it should be stored in the
+            database. If None provided, the description is a standard string
+            created that details who originally added the algorithm to the
+            database.
+        version: str, None = None
+            A version for the algorithm. If None provided, there is an attempt
+            to determine git commit hash of the code.
+
+        Returns
+        ==========
+        user_info: dict
+            A dictionary of the row found or created detailing the user.
+
+        Errors
+        ==========
+        ValueError
+            The version could not be determined through git hash and no version
+            parameter was passed.
+
+        """
 
         # enforce types
         checks.check_types(algorithm, [types.MethodType, types.FunctionType])
@@ -648,6 +811,35 @@ class DatasetDatabase(object):
         algorithm_parameters: dict = {},
         output_dataset_name: Union[str, None] = None,
         output_dataset_description: Union[str, None] = None) -> "Dataset":
+
+        """
+        This is largely the core function of the database as most other
+        functions in some way are passed through this function as to retain
+        information regarding how datasets change and are manipulated. However
+        as a standalone function you can pass a processing function or method
+        through this to pull and apply to a dataset before returning the
+        results back. It is recommended however that if you want to use the
+        above described behavior to use a `dataset.apply` command.
+
+        Example
+        ==========
+        ```
+        >>> test_dataset = Dataset(data)
+        >>> def increment_column(dataset, column):
+                dataset.ds[column] += 1
+
+                return dataset
+        >>> db.process(increment_column,
+                       test_dataset,
+                       algorithm_parameters={"column": "my_column"})
+        info: {'id': 4, 'name': '720a1712-0287-4690-acbc-80a6617ebc63', ...
+
+        ```
+
+        Parameters
+        ==========
+        algorithm
+        """
 
         # enforce types
         checks.check_types(algorithm, [types.MethodType, types.FunctionType])
