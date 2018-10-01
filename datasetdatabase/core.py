@@ -455,8 +455,7 @@ class DatasetDatabase(object):
     """
 
     def __init__(self,
-        config: Union[DatabaseConfig, str,
-            pathlib.Path, Dict[str: str], None] = None,
+        config: Union[DatabaseConfig, str, pathlib.Path, dict, None] = None,
         user: Union[str, None] = None,
         constructor: Union[DatabaseConstructor, None] = None,
         build: bool = False,
