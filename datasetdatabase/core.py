@@ -837,7 +837,31 @@ class DatasetDatabase(object):
 
         Parameters
         ==========
-        algorithm
+        algorithm: types.MethodType, types.FunctionType
+            Any python method of function that you want to use in processing a
+            dataset.
+        input_dataset: Dataset, None = None
+            Which dataset to apply the algorithm to.
+        input_dataset_id: int, None = None
+            Which dataset to pull before applying the algorithm to.
+        input_dataset_info: DatasetInfo, None = None
+            Which dataset to pull before applying the algorithm to.
+        input_dataset_name: str, None = None
+            Which dataset to pull before applying the algorithm to.
+        algorithm_name: str, None = None
+            A name for the algorithm as it should be stored in the database. If
+            None provided, the name is stored as the function name that was
+            passed.
+        algorithm_description: str, None = None
+            A description for the algorithm as it should be stored in the
+            database. If None provided, the description is a standard string
+            created that details who originally added the algorithm to the
+            database.
+        algorithm_version: str, None = None
+            A version for the algorithm. If None provided, there is an attempt
+            to determine git commit hash of the code.
+        run_name: str, None = None
+
         """
 
         # enforce types
@@ -984,7 +1008,7 @@ class DatasetDatabase(object):
             ds_info["OriginDb"] = self
             ds_info = DatasetInfo(**ds_info)
 
-            print("Input dataset already exists in database.")
+            print("Input dataset already exists in database.", ds_info.id)
             return Dataset(dataset=dataset.ds, ds_info=ds_info)
 
         # not found
@@ -1492,7 +1516,7 @@ class Dataset(object):
         self.apply(self.introspector.store_files,
         algorithm_name = "dsdb.Dataset.store_files",
         algorithm_version = VERSION,
-        output_dataset_name = self.name + " with fms stored files",
+        output_dataset_name = self.name + " (FMS)",
         output_dataset_description = self.description,
         algorithm_parameters = params)
 

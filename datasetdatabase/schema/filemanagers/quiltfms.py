@@ -63,7 +63,7 @@ class QuiltFMS(FMSInterface):
             with schema.create("File") as table:
                 table.string("FileId")
                 table.string("OriginalFilepath")
-                table.string("Filetype").nullable()
+                table.string("FileType").nullable()
                 table.string("ReadPath")
                 table.string("MD5").unique()
                 table.string("SHA256").unique()
@@ -174,7 +174,7 @@ class QuiltFMS(FMSInterface):
         file_info = {
             "FileId": str(uuid.uuid4()),
             "OriginalFilepath": str(filepath),
-            "Filetype": filepath.suffix[1:],
+            "FileType": filepath.suffix[1:],
             "ReadPath": read_pkg.load(),
             "MD5": md5,
             "SHA256": sha256,

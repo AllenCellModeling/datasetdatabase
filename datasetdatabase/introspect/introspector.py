@@ -34,6 +34,16 @@ class Introspector(abc.ABC):
         return self._validated
 
 
+    def get_object_hash(self):
+        """
+        Generate a hash for the object that can be reproduced given a
+        reconstruction from binary of the object. Sometimes reconstructions
+        from binary fail due to having different memory optimizations than the
+        original.
+        """
+        return hash(self.obj)
+
+
     @abc.abstractmethod
     def validate(self, **kwargs):
         """
