@@ -13,3 +13,6 @@ fp_example/
 .DS_STORE
 local.db
 test.dataset
+
+# specific files
+generate_docs.ipynb

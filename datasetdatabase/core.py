@@ -51,9 +51,49 @@ UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
 class DatabaseConfig(object):
     """
-    DatabaseConfig is an object that's sole purpose to open a json file, and
-    enforce that all required attributes needed to open a connection to a
-    database are present.
+    Create a DatabaseConfig.
+
+    A DatabaseConfig is an object you can create before connecting to a
+    DatasetDatabase, but more commonly this object will be created by a
+    DatabaseConstructor in the process of connecting or building. A minimum
+    requirements config needs just "driver" and "database" attributes.
+
+    Example
+    ==========
+    ```
+    >>> DatabaseConfig("/path/to/valid/config.json")
+    {"name": "local",
+     "config": {
+        "driver": "sqlite",
+        "database": "local.db"}
+    }
+
+    >>> DatabaseConfig("/path/to/invalid/config.json")
+    AssertionError: "Config must have ('driver', 'database')."
+
+    ```
+
+    Parameters
+    ==========
+    config: str, pathlib.Path, Dict[str: str]
+        A string, or pathlib.Path path to a json file storing the
+        connection config information. Or a dictionary of string keys and
+        string values as a connection config.
+    name: str, None = None
+        A specific name for this connection. If none is passed the name
+        gets set to the value stored by the "database" key in the passed
+        config.
+
+    Returns
+    ==========
+    self
+
+    Errors
+    ==========
+    AssertionError
+        One or more of the required config attributes are missing from the
+        passed config.
+
     """
 
     def __init__(self,
@@ -810,7 +850,6 @@ class DatasetDatabase(object):
         algorithm_parameters: dict = {},
         output_dataset_name: Union[str, None] = None,
         output_dataset_description: Union[str, None] = None) -> "Dataset":
-
         """
         This is largely the core function of the database as most other
         functions in some way are passed through this function as to retain
@@ -861,6 +900,36 @@ class DatasetDatabase(object):
             A version for the algorithm. If None provided, there is an attempt
             to determine git commit hash of the code.
         run_name: str, None = None
+            A name for this specific run. Usually left blank but if a specific
+            run is rather important and you want to easily find it later you
+            can detail a name here.
+        run_description: str, None = None
+            A description for this specific run. Usually left blank but if a
+            specific run is rather important and you need more than just a run
+            name you can detail a run description here.
+        algorithm_parameters: dict = {}
+            A dictionary of parameters that get passed to the algorithm. The
+            dictionary gets expanded when passed to the function so the
+            parameters become keyword arguments.
+        output_dataset_name: str, None = None
+            A name for the produced dataset.
+        output_dataset_description: str, None = None
+            A description for the produced dataset.
+
+        Returns
+        ==========
+        output: Dataset
+            A dataset of the produced containing the results from applying the
+            passed application.
+
+        Erros
+        ==========
+        AssertionError
+            Missing parameters, must provided at least one of the various
+            parameter option sets.
+        ValueError
+            Malformed database, results from the database were not the format
+            expected.
 
         """
 
@@ -989,6 +1058,11 @@ class DatasetDatabase(object):
     def _create_dataset(self,
         dataset: Union["Dataset", object],
         **kwargs) -> "DatasetInfo":
+        # Hidden create dataset method used by the database to actually enforce
+        # datasets are unique and exist. Additionally this is the function that
+        # starts the dataset deconstruction and subsequent creation of a new
+        # DatasetInfo block. Once both are complete the created dataset is
+        # returned.
 
         # enforce types
         checks.check_types(dataset, [Dataset, object])
@@ -1042,10 +1116,51 @@ class DatasetDatabase(object):
 
 
     def _upload_dataset(self, dataset, **params):
+        # Hidden upload dataset function used by the process method to simply
+        # pass the non linked dataset to the output which will then be stored
+        # as a linked dataset.
+
         return dataset
 
 
     def upload_dataset(self, dataset: "Dataset", **kwargs) -> "DatasetInfo":
+        """
+        Upload a dataset to the database. Simply put it prepares a dataset for
+        ingestion and passes parameters to the process function to properly
+        record ingestion time, result, user, etc. If the dataset already exists
+        in the database, it is not stored again and is simply fast returned
+        with the attached DatasetInfo block. It is recommended that you use a
+        `dataset.upload_to` command to upload datasets to database but this
+        function is the underlying core of that function.
+
+        Example
+        ==========
+        ```
+        >>> data = Dataset("/path/to/some/data.csv")
+        >>> db.upload_dataset(data)
+
+        ```
+
+        Parameters
+        ==========
+        dataset: Dataset
+            The dataset object ready for ingestion to a database.
+
+        Returns
+        ==========
+        dataset: Dataset
+            The same dataset object post ingestion with a DatasetInfo block
+            attached.
+
+        Errors
+        ==========
+        AssertionError
+            Unknown dataset hash. The hash for the passed dataset does not
+            match the hash for the originally intialized dataset. Usually
+            indicates that the dataset has in some way changed since original
+            creation.
+        """
+
         # enforce types
         checks.check_types(dataset, Dataset)
 
@@ -1078,12 +1193,50 @@ class DatasetDatabase(object):
 
 
     def get_dataset(self,
-        id: Union[int, None] = None,
-        name: Union[str, None] = None) -> "Dataset":
+        name: Union[str, None] = None,
+        id: Union[int, None] = None) -> "Dataset":
+        """
+        Pull and reconstruct a dataset from the database. Must provided either
+        a dataset name or a dataset id to retrieve the dataset.
+
+        Example
+        ==========
+        ```
+        >>> db.get_dataset("Label Free Images")
+        {info: ...}
+
+        >>> db.get_dataset("This dataset doesn't exist")
+        ValueError: Dataset not found using parameters...
+
+        ```
+
+        Parameters
+        ==========
+        name: str, None = None
+            The name of the dataset you want to reconstruct.
+        id: int, None = None
+            The id of the dataset you want to reconstruct.
+
+        Returns
+        ==========
+        dataset: Dataset
+            A reconstructed Dataset with attached DatasetInfo block.
+
+        Errors
+        ==========
+        AssertionError
+            Missing parameter, must provided either id or name.
+        ValueError
+            Dataset not found using the provided id or name.
+        ValueError
+            Malformed database error, too many values returned from a query
+            expecting a single value or no value to return.
+
+        """
 
         # enforce types
-        checks.check_types(id, [int, type(None)])
         checks.check_types(name, [str, type(None)])
+        checks.check_types(id, [int, type(None)])
 
         # must pass parameter
         assert any(i is not None for i in [id, name]), \
@@ -1119,12 +1272,52 @@ class DatasetDatabase(object):
 
 
     def preview(self,
-        id: Union[int, None] = None,
-        name: Union[str, None] = None) -> "Dataset":
+        name: Union[str, None] = None,
+        id: Union[int, None] = None) -> "Dataset":
+        """
+        Pull and create summary info about a dataset from the database. Must
+        provided either a dataset name or a dataset id to retrieve the dataset.
+
+        Example
+        ==========
+        ```
+        >>> db.preview("Label Free Images")
+        {info: ...}
+
+        >>> db.preview("This dataset doesn't exist")
+        ValueError: Dataset not found using parameters...
+
+        ```
+
+        Parameters
+        ==========
+        name: str, None = None
+            The name of the dataset you want to preview.
+        id: int, None = None
+            The id of the dataset you want to preview.
+
+        Returns
+        ==========
+        preview: Dataset
+            A dictionary with summary info about a dataset that contains things
+            like the DatasetInfo block, the shape, columns/ keys, and any
+            annotations.
+
+        Errors
+        ==========
+        AssertionError
+            Missing parameter, must provided either id or name.
+        ValueError
+            Dataset not found using the provided id or name.
+        ValueError
+            Malformed database error, too many values returned from a query
+            expecting a single value or no value to return.
+
+        """
 
         # enforce types
-        checks.check_types(id, [int, type(None)])
         checks.check_types(name, [str, type(None)])
+        checks.check_types(id, [int, type(None)])
 
         # must pass parameter
         assert any(i is not None for i in [id, name]), \
@@ -1189,6 +1382,47 @@ class DatasetDatabase(object):
         table: str,
         conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]] = []) \
         -> List[Dict[str, GENERIC_TYPES]]:
+        """
+        Get items from a table that match conditions passed. Primarily a
+        wrapper around orator's query functionality.
+
+        Example
+        ==========
+        ```
+        >>> db.get_items_from_table("Dataset", ["Name", "=", "Test Dataset"])
+        [{"DatasetId": 2, "Name": "Test Dataset", ...}]
+
+        >>> db.get_items_from_table("Dataset")
+        [{...},
+         {...},
+         {...}]
+
+        >>> db.get_items_from_table("Dataset", [
+        >>>         ["Description", "=", "algorithm_parameters"],
+        >>>         ["Created", "=", datetime.now()]])
+        []
+
+        ```
+
+        Parameters
+        ==========
+        table: str
+            Which table you want to get items from.
+        conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]]
+            A list or a list of lists containing generic types that the database
+            can construct where conditions from. The where conditions are
+            AND_WHERE conditions, not OR_WHERE.
+
+        Returns
+        ==========
+        results: List[dict]
+            A list of dictionaries containing all the items found that match
+            the conditions passed.
+
+        Errors
+        ==========
+
+        """
 
         # enforce types
         checks.check_types(table, str)
@@ -1200,6 +1434,10 @@ class DatasetDatabase(object):
     def _insert_to_table(self,
         table: str,
         items: Dict[str, GENERIC_TYPES]) -> Dict[str, GENERIC_TYPES]:
+        # Hidden insert to table function used to insert values to tables. Given
+        # a table name as a string and a dictionary with the items to insert as
+        # key = column name, and value = value, will insert the row into the
+        # table. Additionally it returns this created row.
 
         # enforce types
         checks.check_types(table, str)
@@ -1256,6 +1494,13 @@ class DatasetDatabase(object):
 
 
 class DatasetInfo(object):
+    """
+    DatasetInfo is an object used to limit limit how users manipulate datasets
+    that have a connection to a database. If a dataset already has a connection
+    to a database this object is used to check the md5 and sha256 against in
+    order to verify that it has not been malformed.
+    """
+
     def __init__(self,
         DatasetId: int,
         Name: Union[str, None],
@@ -1265,6 +1510,53 @@ class DatasetInfo(object):
         Created: Union[datetime, str],
         OriginDb: DatasetDatabase,
         Description: Union[str, None] = None):
+        """
+        Create a DatasetInfo.
+
+        A DatasetInfo is an object usually created by a database function to be
+        returned to the user as a block attached to a Dataset. It's primary
+        responsibility is to be used as a verification source against changed
+        datasets.
+
+        Example
+        ==========
+        ```
+        >>> stats = db.preview("Label Free Images")
+        >>> type(stats["info"])
+        DatasetInfo
+
+        ```
+
+        Parameters
+        ==========
+        DatasetId: int
+            The dataset id stored in the database.
+        Name: str, None
+            The dataset name stored in the database.
+        Introspector: str
+            Which introspector should be used or was used to deconstruct and
+            reconstruct the dataset.
+        MD5: str
+            The MD5 hash of the underlying data object.
+        SHA256: str
+            The SHA256 hash of the underlying data object.
+        Created: datetime, str
+            The utc datetime when the dataset was created.
+        OriginDb: DatasetDatabase
+            The database that this dataset is stored in.
+        Description: str, None = None
+            The description for the dataset.
+
+        Returns
+        ==========
+        self
+
+        Errors
+        ==========
+        AssertionError
+            The attributes passed could not be verified in the database.
+
+        """
 
         # enforce types
         checks.check_types(DatasetId, int)
@@ -1335,10 +1627,15 @@ class DatasetInfo(object):
 
 
     def _validate_info(self):
+        # Hidden function used to validate that all the attributes passed do
+        # actually exist and are the same in database.
+
+        # get found
         found = self.origin.get_items_from_table("Dataset",
             [["MD5", "=", self.md5],
              ["SHA256", "=", self.sha256]])
 
+        # assert that it exists by len(1)
         assert len(found) == 1, INVALID_DS_INFO
 
 
