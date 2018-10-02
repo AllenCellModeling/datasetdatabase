@@ -1,7 +1,4 @@
-<h1 id="datasetdatabase.utils.tools">datasetdatabase.utils.tools</h1>
-
-
-<h2 id="datasetdatabase.utils.tools.convert_size">convert_size</h2>
+<h1 id="datasetdatabase.utils.tools.convert_size">convert_size</h1>
 
 ```python
 convert_size(size_bytes)

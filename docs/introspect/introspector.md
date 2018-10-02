@@ -16,7 +16,7 @@ build function that allows for your 'Dataset' object to be fully packaged
 with all it's dependancies with Quilt.
 
 For a more defined example of an Introspector look at the
-DataFrameInspector.
+DataFrameIntrospector.
 
 <h3 id="datasetdatabase.introspect.introspector.Introspector.get_object_hash">get_object_hash</h3>
 

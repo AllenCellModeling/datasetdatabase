@@ -48,8 +48,8 @@ def check_types(var,
     """
     Check the provided variable and enforce that it is one of the passed types.
 
-    Example
-    ==========
+
+    #### Example
     ```
     >>> temp = "this is a string"
     >>> check_types(temp, str)
@@ -77,28 +77,33 @@ def check_types(var,
 
     ```
 
-    Parameters
-    ==========
-    var: object
+
+    #### Parameters
+    *var: object*
+    
         A variable to be checked for type.
 
-    allowed: type, list, tuple
+    *allowed: type, list, tuple*
+    
         A single, list, or tuple of types to check the provided variable
         against.
 
-    err: str
+    *err: str*
+    
         An additional error message to be displayed before the standard error
         should the provided variable not pass type checks.
 
-    Returns
-    ==========
-    is_type: bool
+
+    #### Returns
+    *is_type: bool*
+    
         Returns boolean True if the provided variable is of the provided
         type(s).
 
-    Errors
-    ==========
-    TypeError:
+
+    #### Errors
+    *TypeError*
+    
         The provided variable was not one of the provided type(s).
 
     """
@@ -128,8 +133,8 @@ def check_file_exists(f: Union[str, pathlib.Path],
     """
     Check the provided filepath for existence.
 
-    Example
-    ==========
+
+    #### Example
     ```
     >>> temp = "/this/does/exist.jpg"
     >>> check_file_exists(temp)
@@ -150,23 +155,26 @@ def check_file_exists(f: Union[str, pathlib.Path],
 
     ```
 
-    Parameters
-    ==========
-    f: str, pathlib.Path
+    #### Parameters
+    *f: str, pathlib.Path*
+    
         A string or pathlib.Path filepath to be checked for existence.
 
-    err: str
+    *err: str*
+    
         An additional error message to be displayed before the standard error
         should the provided variable not pass existence checks.
 
-    Returns
-    ==========
-    file_exists: bool
+
+    #### Returns
+    *file_exists: bool*
+    
         Returns boolean True if the provided filepath does exist.
 
-    Errors
-    ==========
-    FileNotFoundError:
+
+    #### Errors
+    *FileNotFoundError*
+    
         The provided filepath did not exist.
 
     """
@@ -195,8 +203,8 @@ def check_user(user: Union[str, None] = None,
     """
     Check or get the username for approval.
 
-    Example
-    ==========
+
+    #### Example
     ```
     >>> check_user()
     jacksonb
@@ -215,26 +223,30 @@ def check_user(user: Union[str, None] = None,
 
     ```
 
-    Parameters
-    ==========
-    user: str, None
+
+    #### Parameters
+    *user: str, None*
+    
         A string username.
 
         Default: None (getpass.getuser())
 
-    err: str
+    *err: str*
+    
         An additional error message to be displayed before the standard error
         should the provided user not pass blacklist checks.
 
-    Returns
-    ==========
-    user: str
+
+    #### Returns
+    *user: str*
+    
         Returns string username if the passed or retrieved username passed
         blacklist checks.
 
-    Errors
-    ==========
-    ValueError:
+
+    #### Errors
+    *ValueError*
+    
         The provided username is in the blacklist.
 
     """
@@ -266,8 +278,8 @@ def check_ingest_error(e: Exception,
     """
     Check the provided exception and enforce that it was an ingestion error.
 
-    Example
-    ==========
+
+    #### Example
     ```
     >>> e = QueryException("SQL: ...")
     >>> check_ingest_error(e)
@@ -288,23 +300,27 @@ def check_ingest_error(e: Exception,
 
     ```
 
-    Parameters
-    ==========
-    e: Exception
+
+    #### Parameters
+    *e: Exception*
+    
         An error that needs to be checked for ingestion error.
 
-    err: str
+    *err: str*
+    
         An additional error message to be displayed before the standard error
         should the provided variable not pass type checks.
 
-    Returns
-    ==========
-    was_ingest: bool
+
+    #### Returns
+    *was_ingest: bool*
+    
         Returns boolean True if the provided error was an insertion error.
 
-    Errors
-    ==========
-    TypeError:
+
+    #### Errors
+    *TypeError*
+    
         The provided error was not an insertion error.
 
     """

@@ -16,7 +16,7 @@ class Introspector(abc.ABC):
     with all it's dependancies with Quilt.
 
     For a more defined example of an Introspector look at the
-    DataFrameInspector.
+    DataFrameIntrospector.
     """
     def __init__(self, obj: object):
         self._obj = obj

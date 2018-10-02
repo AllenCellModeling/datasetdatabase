@@ -1,5 +1,5 @@
 # DatasetDatabase
-Scientific modeling efforts increasingly produce intermediate versions of datasets, e.g. analysis resutls, model predictions, training weights for neural nets, etc. In many cases there is no clearly defined final version of the dataset that becomes canonical. As these efforts frequently are intertwined, there is an implicit dependency graph of what version of all prior datasets a give noutput is predicated on. To be able to examine the prior versions of any dataset and track its dependencies we've created a database to track and deduplicate datasets.
+Scientific modeling efforts increasingly produce intermediate versions of datasets, e.g. analysis results, model predictions, training weights for neural nets, etc. In many cases there is no clearly defined final version of the dataset that becomes canonical. As these efforts frequently are intertwined, there is an implicit dependency graph of what version of all prior datasets a given output is produced from. To be able to examine the prior versions of any dataset and track its dependencies we've created a database to track and deduplicate datasets.
 
 Dataset Database (dsdb) is a python package for handling arbitrary datasets (or general python objects) with little to no similarity between any given one. It provides mechanisms for versioning, deduplicating, validation, and tracking datasets as they are ingested, processed, or created.
 
@@ -42,5 +42,3 @@ for usage, and a DISCLAIMER OF ALL WARRANTIES.
 All trademarks referenced herein are property of their respective holders.
 Copyright (c) 2018--, Jackson Maxfield Brown, The Allen Institute for Cell
 Science.
-
-**Last updated: 11 September 2018**
