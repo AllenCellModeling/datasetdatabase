@@ -77,15 +77,15 @@ class DatabaseConfig(object):
     #### Parameters
     *config: str, pathlib.Path, Dict[str: str]*
 
-        A string, or pathlib.Path path to a json file storing the
-        connection config information. Or a dictionary of string keys and
-        string values as a connection config.
+    A string, or pathlib.Path path to a json file storing the
+    connection config information. Or a dictionary of string keys and
+    string values as a connection config.
 
     *name: str, None = None*
 
-        A specific name for this connection. If none is passed the name
-        gets set to the value stored by the "database" key in the passed
-        config.
+    A specific name for this connection. If none is passed the name
+    gets set to the value stored by the "database" key in the passed
+    config.
 
 
     #### Returns
@@ -95,8 +95,8 @@ class DatabaseConfig(object):
     #### Errors
     *AssertionError*
 
-        One or more of the required config attributes are missing from the
-        passed config.
+    One or more of the required config attributes are missing from the
+    passed config.
 
     """
 
@@ -172,17 +172,17 @@ class DatabaseConstructor(object):
     #### Parameters
     *config: DatabaseConfig, None = None*
 
-        The config for the connection to the database. If None provided, LOCAL
-        is chosen.
+    The config for the connection to the database. If None provided, LOCAL
+    is chosen.
 
     *schema: SchemaVersion, None = None*
 
-        The schema to build. If None provided, Minimal is chosen.
+    The schema to build. If None provided, Minimal is chosen.
 
     *fms: FMSInterface, None = None*
 
-        An FMS (File Management System) to handle the supporting files of
-        datasets. If None provided, QuiltFMS is chosen.
+    An FMS (File Management System) to handle the supporting files of
+    datasets. If None provided, QuiltFMS is chosen.
 
 
     #### Returns
@@ -279,7 +279,7 @@ class DatabaseConstructor(object):
         #### Errors
         *AssertionError*
 
-            The local database link is not the appropriate file type (.db).
+        The local database link is not the appropriate file type (.db).
 
         """
 
@@ -347,9 +347,9 @@ class DatabaseConstructor(object):
         #### Returns
         *db: orator.DatabaseManager*
 
-            A constructed database manager object that can be used to fully
-            interact with the database, but additionally, all the tables have
-            been stored in the constructor.tables attribute.
+        A constructed database manager object that can be used to fully
+        interact with the database, but additionally, all the tables have
+        been stored in the constructor.tables attribute.
 
 
         #### Errors
@@ -416,9 +416,9 @@ class DatabaseConstructor(object):
         #### Returns
         *db: orator.DatabaseManager*
 
-            A constructed database manager object that can be used to fully
-            interact with the database, but additionally, all the tables have
-            been stored in the constructor.tables attribute.
+        A constructed database manager object that can be used to fully
+        interact with the database, but additionally, all the tables have
+        been stored in the constructor.tables attribute.
 
 
         #### Errors
@@ -472,36 +472,36 @@ class DatasetDatabase(object):
     #### Parameters
     *config: DatabaseConfig, str, pathlib.Path, dict, None = None*
 
-        An already created DatabaseConfig, or either a str, pathlib.Path,
-        that when read, or dictionary, contains the required attributes to
-        construct a DatabaseConfig. If None provided, a local database
-        connection is created.
+    An already created DatabaseConfig, or either a str, pathlib.Path,
+    that when read, or dictionary, contains the required attributes to
+    construct a DatabaseConfig. If None provided, a local database
+    connection is created.
 
     *user: str, None = None*
 
-        What is the user name you would like to connect with. If None
-        provided, the os system user is used.
+    What is the user name you would like to connect with. If None
+    provided, the os system user is used.
 
     *constructor: DatabaseConstructor, None = None*
 
-        A specific database constructor that will either build the database
-        schema or retrieve the database schema. If None is provided, one is
-        created by initializing a new one and passing the DatabaseConfig,
-        passed or created.
+    A specific database constructor that will either build the database
+    schema or retrieve the database schema. If None is provided, one is
+    created by initializing a new one and passing the DatabaseConfig,
+    passed or created.
 
     *build: bool = False*
 
-        Should the constructor build or get the schema from the database.
+    Should the constructor build or get the schema from the database.
 
     *recent_size: int = 5*
 
-        How many items should be returned by any of the recent calls.
+    How many items should be returned by any of the recent calls.
 
     *processing_limit: int, None = None*
 
-        How many processes should the system max out at when ingesting or
-        getting a dataset. If None provided, os.cpu_count() is used as
-        default.
+    How many processes should the system max out at when ingesting or
+    getting a dataset. If None provided, os.cpu_count() is used as
+    default.
 
 
     #### Returns
@@ -610,27 +610,27 @@ class DatasetDatabase(object):
         #### Parameters
         *user: str, None = None*
 
-            What is the user name of the person you want to add to the database.
-            If None provided, the user is determined by db.user.
+        What is the user name of the person you want to add to the database.
+        If None provided, the user is determined by db.user.
 
         *description: str, None = None*
 
-            What is the description of the person you want to add to the
-            database. If None provided, no description is given.
+        What is the description of the person you want to add to the
+        database. If None provided, no description is given.
 
 
         #### Returns
         *user_info: dict*
 
-            A dictionary of the row found or created detailing the user.
+        A dictionary of the row found or created detailing the user.
 
 
         #### Errors
         *ValueError*
 
-            Too many rows returned from the database when expected only one or
-            zero rows returned. This indicates something is drastically wrong
-            with the database.
+        Too many rows returned from the database when expected only one or
+        zero rows returned. This indicates something is drastically wrong
+        with the database.
 
         """
 
@@ -704,39 +704,39 @@ class DatasetDatabase(object):
         #### Parameters
         *algorithm: types.MethodType, types.FunctionType*
 
-            Any python method of function that you want to use in processing a
-            dataset.
+        Any python method of function that you want to use in processing a
+        dataset.
 
         *name: str, None = None*
 
-            A name for the algorithm as it should be stored in the database. If
-            None provided, the name is stored as the function name that was
-            passed.
+        A name for the algorithm as it should be stored in the database. If
+        None provided, the name is stored as the function name that was
+        passed.
 
         *description: str, None = None*
 
-            A description for the algorithm as it should be stored in the
-            database. If None provided, the description is a standard string
-            created that details who originally added the algorithm to the
-            database.
+        A description for the algorithm as it should be stored in the
+        database. If None provided, the description is a standard string
+        created that details who originally added the algorithm to the
+        database.
 
         *version: str, None = None*
 
-            A version for the algorithm. If None provided, there is an attempt
-            to determine git commit hash of the code.
+        A version for the algorithm. If None provided, there is an attempt
+        to determine git commit hash of the code.
 
 
         #### Returns
         *user_info: dict*
 
-            A dictionary of the row found or created detailing the user.
+        A dictionary of the row found or created detailing the user.
 
 
         #### Errors
         *ValueError*
 
-            The version could not be determined through git hash and no version
-            parameter was passed.
+        The version could not be determined through git hash and no version
+        parameter was passed.
 
         """
 
@@ -857,87 +857,87 @@ class DatasetDatabase(object):
         #### Parameters
         *algorithm: types.MethodType, types.FunctionType*
 
-            Any python method of function that you want to use in processing a
-            dataset.
+        Any python method of function that you want to use in processing a
+        dataset.
 
         *input_dataset: Dataset, None = None*
 
-            Which dataset to apply the algorithm to.
+        Which dataset to apply the algorithm to.
 
         *input_dataset_id: int, None = None*
 
-            Which dataset to pull before applying the algorithm to.
+        Which dataset to pull before applying the algorithm to.
 
         *input_dataset_info: DatasetInfo, None = None*
 
-            Which dataset to pull before applying the algorithm to.
+        Which dataset to pull before applying the algorithm to.
 
         *input_dataset_name: str, None = None*
 
-            Which dataset to pull before applying the algorithm to.
+        Which dataset to pull before applying the algorithm to.
 
         *algorithm_name: str, None = None*
 
-            A name for the algorithm as it should be stored in the database. If
-            None provided, the name is stored as the function name that was
-            passed.
+        A name for the algorithm as it should be stored in the database. If
+        None provided, the name is stored as the function name that was
+        passed.
 
         *algorithm_description: str, None = None*
 
-            A description for the algorithm as it should be stored in the
-            database. If None provided, the description is a standard string
-            created that details who originally added the algorithm to the
-            database.
+        A description for the algorithm as it should be stored in the
+        database. If None provided, the description is a standard string
+        created that details who originally added the algorithm to the
+        database.
 
         *algorithm_version: str, None = None*
 
-            A version for the algorithm. If None provided, there is an attempt
-            to determine git commit hash of the code.
+        A version for the algorithm. If None provided, there is an attempt
+        to determine git commit hash of the code.
 
         *run_name: str, None = None*
 
-            A name for this specific run. Usually left blank but if a specific
-            run is rather important and you want to easily find it later you
-            can detail a name here.
+        A name for this specific run. Usually left blank but if a specific
+        run is rather important and you want to easily find it later you
+        can detail a name here.
 
         *run_description: str, None = None*
 
-            A description for this specific run. Usually left blank but if a
-            specific run is rather important and you need more than just a run
-            name you can detail a run description here.
+        A description for this specific run. Usually left blank but if a
+        specific run is rather important and you need more than just a run
+        name you can detail a run description here.
 
         *algorithm_parameters: dict = {}*
 
-            A dictionary of parameters that get passed to the algorithm. The
-            dictionary gets expanded when passed to the function so the
-            parameters become keyword arguments.
+        A dictionary of parameters that get passed to the algorithm. The
+        dictionary gets expanded when passed to the function so the
+        parameters become keyword arguments.
 
         *output_dataset_name: str, None = None*
 
-            A name for the produced dataset.
+        A name for the produced dataset.
 
         *output_dataset_description: str, None = None*
 
-            A description for the produced dataset.
+        A description for the produced dataset.
 
 
         #### Returns
         **output: Dataset**
 
-            A dataset of the produced containing the results from applying the
-            passed application.
+        A dataset of the produced containing the results from applying the
+        passed application.
 
 
         #### Errors
         **AssertionError**
 
-            Missing parameters, must provided at least one of the various
-            parameter option sets.
+        Missing parameters, must provided at least one of the various
+        parameter option sets.
 
         **ValueError**
 
-            Malformed database, results from the database were not the format
-            expected.
+        Malformed database, results from the database were not the format
+        expected.
 
         """
 
@@ -1153,23 +1153,23 @@ class DatasetDatabase(object):
         #### Parameters
         *dataset: Dataset*
 
-            The dataset object ready for ingestion to a database.
+        The dataset object ready for ingestion to a database.
 
 
         #### Returns
         *dataset: Dataset*
 
-            The same dataset object post ingestion with a DatasetInfo block
-            attached.
+        The same dataset object post ingestion with a DatasetInfo block
+        attached.
 
 
         #### Errors
         *AssertionError*
 
-            Unknown dataset hash. The hash for the passed dataset does not
-            match the hash for the originally intialized dataset. Usually
-            indicates that the dataset has in some way changed since original
-            creation.
+        Unknown dataset hash. The hash for the passed dataset does not
+        match the hash for the originally intialized dataset. Usually
+        indicates that the dataset has in some way changed since original
+        creation.
 
         """
 
@@ -1226,32 +1226,32 @@ class DatasetDatabase(object):
         #### Parameters
         *name: str, None = None*
 
-            The name of the dataset you want to reconstruct.
+        The name of the dataset you want to reconstruct.
 
         *id: int, None = None*
 
-            The id of the dataset you want to reconstruct.
+        The id of the dataset you want to reconstruct.
 
 
         #### Returns
         *dataset: Dataset*
 
-            A reconstructed Dataset with attached DatasetInfo block.
+        A reconstructed Dataset with attached DatasetInfo block.
 
 
         #### Errors
         *AssertionError*
 
-            Missing parameter, must provided either id or name.
+        Missing parameter, must provided either id or name.
 
         *ValueError*
 
-            Dataset not found using the provided id or name.
+        Dataset not found using the provided id or name.
 
         *ValueError*
 
-            Malformed database error, too many values returned from a query
-            expecting a single value or no value to return.
+        Malformed database error, too many values returned from a query
+        expecting a single value or no value to return.
 
         """
 
@@ -1314,34 +1314,34 @@ class DatasetDatabase(object):
         #### Parameters
         *name: str, None = None*
 
-            The name of the dataset you want to preview.
+        The name of the dataset you want to preview.
 
         *id: int, None = None*
 
-            The id of the dataset you want to preview.
+        The id of the dataset you want to preview.
 
 
         #### Returns
         *preview: Dataset*
 
-            A dictionary with summary info about a dataset that contains things
-            like the DatasetInfo block, the shape, columns/ keys, and any
-            annotations.
+        A dictionary with summary info about a dataset that contains things
+        like the DatasetInfo block, the shape, columns/ keys, and any
+        annotations.
 
 
         #### Errors
         *AssertionError*
 
-            Missing parameter, must provided either id or name.
+        Missing parameter, must provided either id or name.
 
         *ValueError*
 
-            Dataset not found using the provided id or name.
+        Dataset not found using the provided id or name.
 
         *ValueError*
 
-            Malformed database error, too many values returned from a query
-            expecting a single value or no value to return.
+        Malformed database error, too many values returned from a query
+        expecting a single value or no value to return.
 
         """
 
@@ -1438,20 +1438,20 @@ class DatasetDatabase(object):
         #### Parameters
         *table: str*
 
-            Which table you want to get items from.
+        Which table you want to get items from.
 
         *conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]]*
 
-            A list or a list of lists containing generic types that the database
-            can construct where conditions from. The where conditions are
-            AND_WHERE conditions, not OR_WHERE.
+        A list or a list of lists containing generic types that the database
+        can construct where conditions from. The where conditions are
+        AND_WHERE conditions, not OR_WHERE.
 
 
         #### Returns
         *results: List[dict]*
 
-            A list of dictionaries containing all the items found that match
-            the conditions passed.
+        A list of dictionaries containing all the items found that match
+        the conditions passed.
 
 
         #### Errors
@@ -1548,36 +1548,36 @@ class DatasetInfo(object):
     #### Parameters
     *DatasetId: int*
 
-        The dataset id stored in the database.
+    The dataset id stored in the database.
 
     *Name: str, None*
 
-        The dataset name stored in the database.
+    The dataset name stored in the database.
 
     *Introspector: str*
 
-        Which introspector should be used or was used to deconstruct and
-        reconstruct the dataset.
+    Which introspector should be used or was used to deconstruct and
+    reconstruct the dataset.
 
     *MD5: str*
 
-        The MD5 hash of the underlying data object.
+    The MD5 hash of the underlying data object.
 
     *SHA256: str*
 
-        The SHA256 hash of the underlying data object.
+    The SHA256 hash of the underlying data object.
 
     *Created: datetime, str*
 
-        The utc datetime when the dataset was created.
+    The utc datetime when the dataset was created.
 
     *OriginDb: DatasetDatabase*
 
-        The database that this dataset is stored in.
+    The database that this dataset is stored in.
 
     *Description: str, None = None*
 
-        The description for the dataset.
+    The description for the dataset.
 
 
     #### Returns
@@ -1587,7 +1587,7 @@ class DatasetInfo(object):
     #### Errors
     *AssertionError*
 
-        The attributes passed could not be verified in the database.
+    The attributes passed could not be verified in the database.
 
     """
 
