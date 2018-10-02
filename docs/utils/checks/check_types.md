@@ -37,31 +37,26 @@ Given value: this is a string
 
 
 #### Parameters
-*var: object*
-
+##### var: object
 A variable to be checked for type.
 
-*allowed: type, list, tuple*
-
+##### allowed: type, list, tuple
 A single, list, or tuple of types to check the provided variable
 against.
 
-*err: str*
-
+##### err: str
 An additional error message to be displayed before the standard error
 should the provided variable not pass type checks.
 
 
 #### Returns
-*is_type: bool*
-
+##### is_type: bool
 Returns boolean True if the provided variable is of the provided
 type(s).
 
 
 #### Errors
-*TypeError*
-
+##### TypeError
 The provided variable was not one of the provided type(s).
 
 

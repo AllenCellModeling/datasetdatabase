@@ -79,31 +79,26 @@ def check_types(var,
 
 
     #### Parameters
-    *var: object*
-
+    ##### var: object
     A variable to be checked for type.
 
-    *allowed: type, list, tuple*
-
+    ##### allowed: type, list, tuple
     A single, list, or tuple of types to check the provided variable
     against.
 
-    *err: str*
-
+    ##### err: str
     An additional error message to be displayed before the standard error
     should the provided variable not pass type checks.
 
 
     #### Returns
-    *is_type: bool*
-
+    ##### is_type: bool
     Returns boolean True if the provided variable is of the provided
     type(s).
 
 
     #### Errors
-    *TypeError*
-
+    ##### TypeError
     The provided variable was not one of the provided type(s).
 
     """
@@ -156,25 +151,21 @@ def check_file_exists(f: Union[str, pathlib.Path],
     ```
 
     #### Parameters
-    *f: str, pathlib.Path*
-
+    ##### f: str, pathlib.Path
     A string or pathlib.Path filepath to be checked for existence.
 
-    *err: str*
-
+    ##### err: str
     An additional error message to be displayed before the standard error
     should the provided variable not pass existence checks.
 
 
     #### Returns
-    *file_exists: bool*
-
+    ##### file_exists: bool
     Returns boolean True if the provided filepath does exist.
 
 
     #### Errors
-    *FileNotFoundError*
-
+    ##### FileNotFoundError
     The provided filepath did not exist.
 
     """
@@ -225,28 +216,22 @@ def check_user(user: Union[str, None] = None,
 
 
     #### Parameters
-    *user: str, None*
+    ##### user: str, None
+    A string username. Default: None (getpass.getuser())
 
-    A string username.
-
-    Default: None (getpass.getuser())
-
-    *err: str*
-
+    ##### err: str
     An additional error message to be displayed before the standard error
     should the provided user not pass blacklist checks.
 
 
     #### Returns
-    *user: str*
-
+    ##### user: str
     Returns string username if the passed or retrieved username passed
     blacklist checks.
 
 
     #### Errors
-    *ValueError*
-
+    ##### ValueError
     The provided username is in the blacklist.
 
     """
@@ -302,25 +287,21 @@ def check_ingest_error(e: Exception,
 
 
     #### Parameters
-    *e: Exception*
-
+    ##### e: Exception
     An error that needs to be checked for ingestion error.
 
-    *err: str*
-
+    ##### err: str
     An additional error message to be displayed before the standard error
     should the provided variable not pass type checks.
 
 
     #### Returns
-    *was_ingest: bool*
-
+    ##### was_ingest: bool
     Returns boolean True if the provided error was an insertion error.
 
 
     #### Errors
-    *TypeError*
-
+    ##### TypeError
     The provided error was not an insertion error.
 
     """

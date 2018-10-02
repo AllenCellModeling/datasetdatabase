@@ -30,25 +30,21 @@ Something besides insertion went wrong...
 
 
 #### Parameters
-*e: Exception*
-
+##### e: Exception
 An error that needs to be checked for ingestion error.
 
-*err: str*
-
+##### err: str
 An additional error message to be displayed before the standard error
 should the provided variable not pass type checks.
 
 
 #### Returns
-*was_ingest: bool*
-
+##### was_ingest: bool
 Returns boolean True if the provided error was an insertion error.
 
 
 #### Errors
-*TypeError*
-
+##### TypeError
 The provided error was not an insertion error.
 
 

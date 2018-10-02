@@ -28,28 +28,22 @@ User: "admin", is a blacklisted username. Please pass a valid username.
 
 
 #### Parameters
-*user: str, None*
+##### user: str, None
+A string username. Default: None (getpass.getuser())
 
-A string username.
-
-Default: None (getpass.getuser())
-
-*err: str*
-
+##### err: str
 An additional error message to be displayed before the standard error
 should the provided user not pass blacklist checks.
 
 
 #### Returns
-*user: str*
-
+##### user: str
 Returns string username if the passed or retrieved username passed
 blacklist checks.
 
 
 #### Errors
-*ValueError*
-
+##### ValueError
 The provided username is in the blacklist.
 
 

@@ -29,23 +29,20 @@ both a custom DatasetDatabase schema and a custom FMS interface.
 
 
 #### Parameters
-*config: DatabaseConfig, None = None*
-
+##### config: DatabaseConfig, None = None
 The config for the connection to the database. If None provided, LOCAL
 is chosen.
 
-*schema: SchemaVersion, None = None*
-
+##### schema: SchemaVersion, None = None
 The schema to build. If None provided, Minimal is chosen.
 
-*fms: FMSInterface, None = None*
-
+##### fms: FMSInterface, None = None
 An FMS (File Management System) to handle the supporting files of
 datasets. If None provided, QuiltFMS is chosen.
 
 
 #### Returns
-*self*
+##### self
 
 
 #### Errors
@@ -78,8 +75,7 @@ AssertionError: "Local databases must have suffix '.db'"
 #### Returns
 
 #### Errors
-*AssertionError*
-
+##### AssertionError
 The local database link is not the appropriate file type (.db).
 
 
@@ -130,8 +126,7 @@ created.
 #### Parameters
 
 #### Returns
-*db: orator.DatabaseManager*
-
+##### db: orator.DatabaseManager
 A constructed database manager object that can be used to fully
 interact with the database, but additionally, all the tables have
 been stored in the constructor.tables attribute.
@@ -160,8 +155,7 @@ without overwriting or constructing useless tables.
 #### Parameters
 
 #### Returns
-*db: orator.DatabaseManager*
-
+##### db: orator.DatabaseManager
 A constructed database manager object that can be used to fully
 interact with the database, but additionally, all the tables have
 been stored in the constructor.tables attribute.

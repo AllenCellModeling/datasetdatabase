@@ -29,25 +29,21 @@ Given filepath: /this/does/not/exist.png
 ```
 
 #### Parameters
-*f: str, pathlib.Path*
-
+##### f: str, pathlib.Path
 A string or pathlib.Path filepath to be checked for existence.
 
-*err: str*
-
+##### err: str
 An additional error message to be displayed before the standard error
 should the provided variable not pass existence checks.
 
 
 #### Returns
-*file_exists: bool*
-
+##### file_exists: bool
 Returns boolean True if the provided filepath does exist.
 
 
 #### Errors
-*FileNotFoundError*
-
+##### FileNotFoundError
 The provided filepath did not exist.
 
 

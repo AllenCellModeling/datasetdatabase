@@ -25,42 +25,36 @@ AssertionError: "Config must have ('driver', 'database')."
 
 
 #### Parameters
-*config: DatabaseConfig, str, pathlib.Path, dict, None = None*
-
+##### config: DatabaseConfig, str, pathlib.Path, dict, None = None
 An already created DatabaseConfig, or either a str, pathlib.Path,
 that when read, or dictionary, contains the required attributes to
 construct a DatabaseConfig. If None provided, a local database
 connection is created.
 
-*user: str, None = None*
-
+##### user: str, None = None
 What is the user name you would like to connect with. If None
 provided, the os system user is used.
 
-*constructor: DatabaseConstructor, None = None*
-
+##### constructor: DatabaseConstructor, None = None
 A specific database constructor that will either build the database
 schema or retrieve the database schema. If None is provided, one is
 created by initializing a new one and passing the DatabaseConfig,
 passed or created.
 
-*build: bool = False*
-
+##### build: bool = False
 Should the constructor build or get the schema from the database.
 
-*recent_size: int = 5*
-
+##### recent_size: int = 5
 How many items should be returned by any of the recent calls.
 
-*processing_limit: int, None = None*
-
+##### processing_limit: int, None = None
 How many processes should the system max out at when ingesting or
 getting a dataset. If None provided, os.cpu_count() is used as
 default.
 
 
 #### Returns
-*self*
+##### self
 
 
 #### Errors
@@ -90,26 +84,22 @@ updates the user and user_info attributes of the DatasetDatabase object.
 
 
 #### Parameters
-*user: str, None = None*
-
+##### user: str, None = None
 What is the user name of the person you want to add to the database.
 If None provided, the user is determined by db.user.
 
-*description: str, None = None*
-
+##### description: str, None = None
 What is the description of the person you want to add to the
 database. If None provided, no description is given.
 
 
 #### Returns
-*user_info: dict*
-
+##### user_info: dict
 A dictionary of the row found or created detailing the user.
 
 
 #### Errors
-*ValueError*
-
+##### ValueError
 Too many rows returned from the database when expected only one or
 zero rows returned. This indicates something is drastically wrong
 with the database.
@@ -148,39 +138,33 @@ ValueError: Could not determine version of algorithm.
 
 
 #### Parameters
-*algorithm: types.MethodType, types.FunctionType*
-
+##### algorithm: types.MethodType, types.FunctionType
 Any python method of function that you want to use in processing a
 dataset.
 
-*name: str, None = None*
-
+##### name: str, None = None
 A name for the algorithm as it should be stored in the database. If
 None provided, the name is stored as the function name that was
 passed.
 
-*description: str, None = None*
-
+##### description: str, None = None
 A description for the algorithm as it should be stored in the
 database. If None provided, the description is a standard string
 created that details who originally added the algorithm to the
 database.
 
-*version: str, None = None*
-
+##### version: str, None = None
 A version for the algorithm. If None provided, there is an attempt
 to determine git commit hash of the code.
 
 
 #### Returns
-*user_info: dict*
-
+##### user_info: dict
 A dictionary of the row found or created detailing the user.
 
 
 #### Errors
-*ValueError*
-
+##### ValueError
 The version could not be determined through git hash and no version
 parameter was passed.
 
@@ -216,87 +200,71 @@ info: {'id': 4, 'name': '720a1712-0287-4690-acbc-80a6617ebc63', ...
 
 
 #### Parameters
-*algorithm: types.MethodType, types.FunctionType*
-
+##### algorithm: types.MethodType, types.FunctionType
 Any python method of function that you want to use in processing a
 dataset.
 
-*input_dataset: Dataset, None = None*
-
+##### input_dataset: Dataset, None = None
 Which dataset to apply the algorithm to.
 
-*input_dataset_id: int, None = None*
-
+##### input_dataset_id: int, None = None
 Which dataset to pull before applying the algorithm to.
 
-*input_dataset_info: DatasetInfo, None = None*
-
+##### input_dataset_info: DatasetInfo, None = None
 Which dataset to pull before applying the algorithm to.
 
-*input_dataset_name: str, None = None*
-
+##### input_dataset_name: str, None = None
 Which dataset to pull before applying the algorithm to.
 
-*algorithm_name: str, None = None*
-
+##### algorithm_name: str, None = None
 A name for the algorithm as it should be stored in the database. If
 None provided, the name is stored as the function name that was
 passed.
 
-*algorithm_description: str, None = None*
-
+##### algorithm_description: str, None = None
 A description for the algorithm as it should be stored in the
 database. If None provided, the description is a standard string
 created that details who originally added the algorithm to the
 database.
 
-*algorithm_version: str, None = None*
-
+##### algorithm_version: str, None = None
 A version for the algorithm. If None provided, there is an attempt
 to determine git commit hash of the code.
 
-*run_name: str, None = None*
-
+##### run_name: str, None = None
 A name for this specific run. Usually left blank but if a specific
 run is rather important and you want to easily find it later you
 can detail a name here.
 
-*run_description: str, None = None*
-
+##### run_description: str, None = None
 A description for this specific run. Usually left blank but if a
 specific run is rather important and you need more than just a run
 name you can detail a run description here.
 
-*algorithm_parameters: dict = {}*
-
+##### algorithm_parameters: dict = {}
 A dictionary of parameters that get passed to the algorithm. The
 dictionary gets expanded when passed to the function so the
 parameters become keyword arguments.
 
-*output_dataset_name: str, None = None*
-
+##### output_dataset_name: str, None = None
 A name for the produced dataset.
 
-*output_dataset_description: str, None = None*
-
+##### output_dataset_description: str, None = None
 A description for the produced dataset.
 
 
 #### Returns
-**output: Dataset**
-
+##### output: Dataset
 A dataset of the produced containing the results from applying the
 passed application.
 
 
 #### Errors
-**AssertionError**
-
+##### AssertionError
 Missing parameters, must provided at least one of the various
 parameter option sets.
 
-**ValueError**
-
+##### ValueError
 Malformed database, results from the database were not the format
 expected.
 
@@ -325,21 +293,18 @@ function is the underlying core of that function.
 
 
 #### Parameters
-*dataset: Dataset*
-
+##### dataset: Dataset
 The dataset object ready for ingestion to a database.
 
 
 #### Returns
-*dataset: Dataset*
-
+##### dataset: Dataset
 The same dataset object post ingestion with a DatasetInfo block
 attached.
 
 
 #### Errors
-*AssertionError*
-
+##### AssertionError
 Unknown dataset hash. The hash for the passed dataset does not
 match the hash for the originally intialized dataset. Usually
 indicates that the dataset has in some way changed since original
@@ -368,32 +333,26 @@ ValueError: Dataset not found using parameters...
 
 
 #### Parameters
-*name: str, None = None*
-
+##### name: str, None = None
 The name of the dataset you want to reconstruct.
 
-*id: int, None = None*
-
+##### id: int, None = None
 The id of the dataset you want to reconstruct.
 
 
 #### Returns
-*dataset: Dataset*
-
+##### dataset: Dataset
 A reconstructed Dataset with attached DatasetInfo block.
 
 
 #### Errors
-*AssertionError*
-
+##### AssertionError
 Missing parameter, must provided either id or name.
 
-*ValueError*
-
+##### ValueError
 Dataset not found using the provided id or name.
 
-*ValueError*
-
+##### ValueError
 Malformed database error, too many values returned from a query
 expecting a single value or no value to return.
 
@@ -420,34 +379,28 @@ ValueError: Dataset not found using parameters...
 
 
 #### Parameters
-*name: str, None = None*
-
+##### name: str, None = None
 The name of the dataset you want to preview.
 
-*id: int, None = None*
-
+##### id: int, None = None
 The id of the dataset you want to preview.
 
 
 #### Returns
-*preview: Dataset*
-
+##### preview: Dataset
 A dictionary with summary info about a dataset that contains things
 like the DatasetInfo block, the shape, columns/ keys, and any
 annotations.
 
 
 #### Errors
-*AssertionError*
-
+##### AssertionError
 Missing parameter, must provided either id or name.
 
-*ValueError*
-
+##### ValueError
 Dataset not found using the provided id or name.
 
-*ValueError*
-
+##### ValueError
 Malformed database error, too many values returned from a query
 expecting a single value or no value to return.
 
@@ -481,23 +434,21 @@ wrapper around orator's query functionality.
 
 
 #### Parameters
-*table: str*
-
+##### table: str
 Which table you want to get items from.
 
-*conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]]*
-
+##### conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]]
 A list or a list of lists containing generic types that the database
 can construct where conditions from. The where conditions are
 AND_WHERE conditions, not OR_WHERE.
 
 
 #### Returns
-*results: List[dict]*
-
+##### results: List[dict]
 A list of dictionaries containing all the items found that match
 the conditions passed.
 
 
 #### Errors
+
 

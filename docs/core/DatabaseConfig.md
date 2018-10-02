@@ -28,26 +28,23 @@ AssertionError: "Config must have ('driver', 'database')."
 
 
 #### Parameters
-*config: str, pathlib.Path, Dict[str: str]*
-
+##### config: str, pathlib.Path, Dict[str: str]
 A string, or pathlib.Path path to a json file storing the
 connection config information. Or a dictionary of string keys and
 string values as a connection config.
 
-*name: str, None = None*
-
+##### name: str, None = None
 A specific name for this connection. If none is passed the name
 gets set to the value stored by the "database" key in the passed
 config.
 
 
 #### Returns
-*self*
+##### self
 
 
 #### Errors
-*AssertionError*
-
+##### AssertionError
 One or more of the required config attributes are missing from the
 passed config.
 

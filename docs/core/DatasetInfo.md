@@ -22,47 +22,38 @@ DatasetInfo
 
 
 #### Parameters
-*DatasetId: int*
-
+##### DatasetId: int
 The dataset id stored in the database.
 
-*Name: str, None*
-
+##### Name: str, None
 The dataset name stored in the database.
 
-*Introspector: str*
-
+##### Introspector: str
 Which introspector should be used or was used to deconstruct and
 reconstruct the dataset.
 
-*MD5: str*
-
+##### MD5: str
 The MD5 hash of the underlying data object.
 
-*SHA256: str*
-
+##### SHA256: str
 The SHA256 hash of the underlying data object.
 
-*Created: datetime, str*
-
+##### Created: datetime, str
 The utc datetime when the dataset was created.
 
-*OriginDb: DatasetDatabase*
-
+##### OriginDb: DatasetDatabase
 The database that this dataset is stored in.
 
-*Description: str, None = None*
-
+##### Description: str, None = None
 The description for the dataset.
 
 
 #### Returns
-*self*
+##### self
 
 
 #### Errors
-*AssertionError*
-
+##### AssertionError
 The attributes passed could not be verified in the database.
 
 
