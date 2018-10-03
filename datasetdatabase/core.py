@@ -1452,11 +1452,11 @@ class DatasetDatabase(object):
             "RunOutput", ["DatasetId", "=", id])
 
         # deletes
-        self.db.table("GroupDataset").where("DatasetId", "=", ds_id).delete()
-        self.db.table("RunOutput").where("DatasetId", "=", ds_id).delete()
+        self.db.table("GroupDataset").where("DatasetId", "=", id).delete()
+        self.db.table("RunOutput").where("DatasetId", "=", id).delete()
         for run in runs:
             self.db.table("Run").where("RunId", "=", run["RunId"]).delete()
-        self.db.table("Dataset").where("DatasetId", "=", ds_id).delete()
+        self.db.table("Dataset").where("DatasetId", "=", id).delete()
 
 
     @property
