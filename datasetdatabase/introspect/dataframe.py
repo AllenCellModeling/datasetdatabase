@@ -28,7 +28,10 @@ class DataFrameIntrospector(Introspector):
         # enforce types
         checks.check_types(obj, pd.DataFrame)
 
-        self._obj = obj
+        # store obj and ensure index
+        self._obj = obj.reset_index(drop=True)
+
+        # set validated state
         self._validated = {"types": {k: False for k in self.obj.columns},
                            "values": {k: False for k in self.obj.columns},
                            "files": False}
