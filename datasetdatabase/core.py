@@ -45,6 +45,7 @@ GENERIC_TYPES = Union[bytes, str, int, float, None, datetime]
 MISSING_INIT = "Must provide either an object or a DatasetInfo object."
 TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
 DATASET_NOT_FOUND = "Dataset not found using keyword arguments:\n\t{kw}"
+NONAPPROVED_PURGE = "Cannot purge a dataset that was used as an input to a run."
 
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
@@ -1419,6 +1420,43 @@ class DatasetDatabase(object):
         checks.check_types(items, dict)
 
         return tools.insert_to_db_table(self.db, table, items)
+
+
+    def _purge_dataset(self,
+        name: Union[str, None] = None,
+        id: Union[int, None] = None):
+        # Hidden purge dataset method that will simply remove the group dataset
+        # joins, the run output, run, and dataset rows related to a dataset name
+        # or id. If the dataset is used a run input the dataset will not be
+        # removed.
+
+        # enforce types
+        checks.check_types(name, [str, type(None)])
+        checks.check_types(id, [int, type(None)])
+
+        # must pass parameter
+        assert any(i is not None for i in [id, name]), \
+            MISSING_PARAMETER.format(p=["id", "name"])
+
+        # specific
+        if id is None:
+            id = self.get_items_from_table(
+                "Dataset", ["Name", "=", name])[0]["DatasetId"]
+
+        # do not remove a dataset used as an input
+        if self.db.table("RunInput").where("DatasetId", "=", id).count() > 0:
+            raise ValueError(NONAPPROVED_PURGE)
+
+        # get all runs
+        runs = self.get_items_from_table(
+            "RunOutput", ["DatasetId", "=", id])
+
+        # deletes
+        self.db.table("GroupDataset").where("DatasetId", "=", ds_id).delete()
+        self.db.table("RunOutput").where("DatasetId", "=", ds_id).delete()
+        for run in runs:
+            self.db.table("Run").where("RunId", "=", run["RunId"]).delete()
+        self.db.table("Dataset").where("DatasetId", "=", ds_id).delete()
 
 
     @property
