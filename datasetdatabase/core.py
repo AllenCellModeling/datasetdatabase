@@ -1741,7 +1741,7 @@ class Dataset(object):
 
         # read dataset
         if isinstance(dataset, (str, pathlib.Path)):
-            return read_dataset(dataset)
+            dataset = read_dataset(dataset).ds
 
         # info
         self._info = ds_info
@@ -2357,7 +2357,7 @@ def _read_dataset(path: pathlib.Path) -> Dataset:
     return Dataset(dataset=saved["obj"], ds_info=ds_info)
 
 
-EXTENSION_MAP = {".csv": pd_read_csv,
+EXTENSION_MAP = {".csv": _read_csv,
                  ".dataset": _read_dataset}
 
 
