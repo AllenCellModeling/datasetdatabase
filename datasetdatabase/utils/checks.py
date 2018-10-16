@@ -2,12 +2,8 @@
 
 # installed
 from typing import Union
-import pandas as pd
 import pathlib
 import getpass
-
-# self
-from .progressbar import ProgressBar
 
 # globals
 CHECK_TYPES_ERR = """

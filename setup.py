@@ -10,7 +10,7 @@ exclude_dirs = ["configs",
 
 PACKAGES = find_packages(exclude=exclude_dirs)
 
-# Get version info, stored at legacy_handoff/labkey_upload/version.py
+# Get version info, stored at datasetdatabase/version.py
 version_file = os.path.join("datasetdatabase", "version.py")
 with open(version_file) as f:
     exec(f.read())

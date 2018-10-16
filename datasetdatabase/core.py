@@ -6,7 +6,6 @@ from typing import Union, Dict, List
 from datetime import datetime
 import _pickle as pickle
 import subprocess
-import importlib
 import inspect
 import pathlib
 import hashlib
@@ -30,14 +29,15 @@ from .version import VERSION
 
 # globals
 REQUIRED_CONFIG_ITEMS = ("driver", "database")
-MISSING_REQUIRED_ITEMS = "Config must have {i}.".format(i=REQUIRED_CONFIG_ITEMS)
+MISSING_REQUIRED_ITEMS = "Config must have {i}."\
+                         .format(i=REQUIRED_CONFIG_ITEMS)
 MALFORMED_LOCAL_LINK = "Local databases must have suffix '.db'"
 
 INVALID_DS_INFO = "This set of attributes could not be found in the linked db."
 NO_DS_INFO = "There is no dataset info attached to this dataset object."
 DATETIME_PARSE = "%Y-%m-%d %H:%M:%S.%f"
 
-MISSING_PARAMETER = "Must provide at least one of the following parameters: {p}"
+MISSING_PARAMETER = "Must provide at least one of the following: {p}"
 VERSION_LOOKUP = ["__version__", "__VERSION__", "VERSION", "version"]
 UNKNOWN_DATASET_HASH = "Dataset hash changed.\n\tOriginal: {o}\n\tCurrent: {c}"
 
@@ -45,7 +45,9 @@ GENERIC_TYPES = Union[bytes, str, int, float, None, datetime]
 MISSING_INIT = "Must provide either an object or a DatasetInfo object."
 TOO_MANY_RETURN_VALUES = "Too many values returned from query expecting {n}."
 DATASET_NOT_FOUND = "Dataset not found using keyword arguments:\n\t{kw}"
-NONAPPROVED_PURGE = "Cannot purge a dataset that was used as an input to a run."
+NONAPPROVED_PURGE = "Cannot purge a dataset that was used as an input."
+
+MISSING_DATASET_INFO = "Dataset info attribute missing. No link to database."
 
 UNKNOWN_EXTENSION = "Unsure how to read dataset from the passed path.\n\t{p}"
 
@@ -99,8 +101,8 @@ class DatabaseConfig(object):
     """
 
     def __init__(self,
-        config: Union[str, pathlib.Path, Dict[str, str]],
-        name: Union[str, None] = None):
+                 config: Union[str, pathlib.Path, Dict[str, str]],
+                 name: Union[str, None] = None):
         # enforce types
         checks.check_types(name, [str, type(None)])
         checks.check_types(config, [str, pathlib.Path, dict])
@@ -189,9 +191,9 @@ class DatabaseConstructor(object):
     """
 
     def __init__(self,
-        config: Union[DatabaseConfig, None] = None,
-        schema: Union[SchemaVersion, None] = None,
-        fms: Union[FMSInterface, None] = None):
+                 config: Union[DatabaseConfig, None] = None,
+                 schema: Union[SchemaVersion, None] = None,
+                 fms: Union[FMSInterface, None] = None):
         # enforce types
         checks.check_types(config, [DatabaseConfig, type(None)])
         checks.check_types(schema, [SchemaVersion, type(None)])
@@ -209,11 +211,9 @@ class DatabaseConstructor(object):
         self._db = orator.DatabaseManager(dict(self.config))
         self._orator_schema = orator.Schema(self.db)
 
-
     @property
     def config(self):
         return self._config
-
 
     @property
     def schema(self):
@@ -224,7 +224,6 @@ class DatabaseConstructor(object):
 
         return self._schema
 
-
     @property
     def fms(self):
         # None passed, load default
@@ -234,11 +233,9 @@ class DatabaseConstructor(object):
 
         return self._fms
 
-
     @property
     def tables(self):
         return self._tables
-
 
     @property
     def db(self):
@@ -247,7 +244,6 @@ class DatabaseConstructor(object):
     @property
     def orator_schema(self):
         return self._orator_schema
-
 
     def prepare_connection(self):
         """
@@ -285,7 +281,6 @@ class DatabaseConstructor(object):
             if not link.exists():
                 link.parent.mkdir(parents=True, exist_ok=True)
 
-
     def create_schema(self):
         """
         Create all the tables referenced by the SchemaVersion that was passed
@@ -315,19 +310,18 @@ class DatabaseConstructor(object):
 
         # create file table from fms module
         if self.fms.table_name not in self.tables and \
-            self.fms.table_name is not None:
+                self.fms.table_name is not None:
             self.fms.create_File(self.orator_schema)
             self._tables.append(self.fms.table_name)
-
 
     def build(self):
         """
         Connect to a database and build the tables found in the SchemaVersion
         passed to the DatabaseConstructor initialization.
 
-        This is mainly a wrapper around the prepare_connection and create_schema
-        functions that additionally returns the orator.DatabaseManager object
-        created.
+        This is mainly a wrapper around the prepare_connection and
+        create_schema functions that additionally returns the
+        orator.DatabaseManager object created.
 
 
         #### Example
@@ -356,7 +350,6 @@ class DatabaseConstructor(object):
         self.create_schema()
 
         return self.db
-
 
     def _drop_schema(self):
         """
@@ -389,7 +382,6 @@ class DatabaseConstructor(object):
         # drop
         for tbl in drop_order:
             self.orator_schema.drop_if_exists(tbl)
-
 
     def get_tables(self):
         """
@@ -424,7 +416,8 @@ class DatabaseConstructor(object):
             names = self.db.table("sqlite_master") \
                            .select("name") \
                            .where("type", "=", "table").get()
-            names = [t["name"] for t in names if t["name"] != "sqlite_sequence"]
+            names = [t["name"] for t in names if
+                     t["name"] != "sqlite_sequence"]
         else:
             names = self.db.table("pg_catalog.pg_tables") \
                            .select("tablename") \
@@ -499,15 +492,26 @@ class DatasetDatabase(object):
     """
 
     def __init__(self,
-        config: Union[DatabaseConfig, str, pathlib.Path, dict, None] = None,
-        user: Union[str, None] = None,
-        constructor: Union[DatabaseConstructor, None] = None,
-        build: bool = False,
-        recent_size: int = 5,
-        processing_limit: Union[int, None] = None):
+                 config: Union[
+                    DatabaseConfig,
+                    str,
+                    pathlib.Path,
+                    dict,
+                    None
+                 ] = None,
+                 user: Union[str, None] = None,
+                 constructor: Union[DatabaseConstructor, None] = None,
+                 build: bool = False,
+                 recent_size: int = 5,
+                 processing_limit: Union[int, None] = None):
         # enforce types
-        checks.check_types(config,
-            [DatabaseConfig, str, pathlib.Path, dict, type(None)])
+        checks.check_types(config, [
+            DatabaseConfig,
+            str,
+            pathlib.Path,
+            dict,
+            type(None)
+        ])
         checks.check_types(user, [str, type(None)])
         checks.check_types(constructor, [DatabaseConstructor, type(None)])
         checks.check_types(build, bool)
@@ -526,7 +530,7 @@ class DatasetDatabase(object):
             config = LOCAL
 
         # read config
-        if isinstance(config, (str, pathlib.Path)):
+        if isinstance(config, (str, dict, pathlib.Path)):
             config = DatabaseConfig(config)
 
         # state basic items
@@ -547,11 +551,9 @@ class DatasetDatabase(object):
         # upload basic items
         self._user_info = self.get_or_create_user(self.user)
 
-
     @property
     def config(self):
         return self._config
-
 
     @property
     def user(self):
@@ -561,25 +563,22 @@ class DatasetDatabase(object):
     def user_info(self):
         return self._user_info
 
-
     @property
     def constructor(self):
         return self._constructor
-
 
     @property
     def db(self):
         return self._db
 
-
     def get_or_create_user(self,
-        user: Union[str, None] = None,
-        description: Union[str, None] = None) -> Dict[str, GENERIC_TYPES]:
+                           user: Union[str, None] = None,
+                           description: Union[str, None] = None):
         """
         Get or create a user in the database. This function is largely a
         wrapper around the insert to table functionality in that it gets or
         inserts whichever user and description is passed but additionally
-        updates the user and user_info attributes of the DatasetDatabase object.
+        updates the user and user_info attributes of self.
 
 
         #### Example
@@ -634,10 +633,11 @@ class DatasetDatabase(object):
 
         # not found
         if len(user_info) == 0:
-            user_info = self._insert_to_table("User",
-                {"Name": user,
+            user_info = self._insert_to_table("User", {
+                 "Name": user,
                  "Description": description,
-                 "Created": datetime.utcnow()})
+                 "Created": datetime.utcnow()
+                })
 
             self._user_info = user_info
             return self.user_info
@@ -650,12 +650,14 @@ class DatasetDatabase(object):
         # database structure error
         raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
-
     def get_or_create_algorithm(self,
-        algorithm: Union[types.MethodType, types.FunctionType],
-        name: Union[str, None] = None,
-        description: Union[str, None] = None,
-        version: Union[str, None] = None) -> Dict[str, GENERIC_TYPES]:
+                                algorithm: Union[
+                                    types.MethodType,
+                                    types.FunctionType
+                                ],
+                                name: Union[str, None] = None,
+                                description: Union[str, None] = None,
+                                version: Union[str, None] = None):
         """
         Get or create an algorithm in the database. This function is largely a
         wrapper around the insert to table functionality in that it gets or
@@ -779,32 +781,32 @@ class DatasetDatabase(object):
             return alg_info[0]
         # new
         elif len(alg_info) == 0:
-            alg_info = self._insert_to_table("Algorithm",
-                {"Name": name,
-                 "Description": description,
-                 "Version": version,
-                 "Created": datetime.utcnow()})
+            alg_info = self._insert_to_table("Algorithm", {
+                "Name": name,
+                "Description": description,
+                "Version": version,
+                "Created": datetime.utcnow()
+            })
             return alg_info
 
         # database structure error
         else:
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
-
     def process(self,
-        algorithm: Union[types.MethodType, types.FunctionType],
-        input_dataset: Union["Dataset", None] = None,
-        input_dataset_info: Union["DatasetInfo", None] = None,
-        input_dataset_id: Union[int, None] = None,
-        input_dataset_name: Union[str, None] = None,
-        algorithm_name: Union[str, None] = None,
-        algorithm_description: Union[str, None] = None,
-        algorithm_version: Union[str, None] = None,
-        run_name: Union[str, None] = None,
-        run_description: Union[str, None] = None,
-        algorithm_parameters: dict = {},
-        output_dataset_name: Union[str, None] = None,
-        output_dataset_description: Union[str, None] = None) -> "Dataset":
+                algorithm: Union[types.MethodType, types.FunctionType],
+                input_dataset: Union["Dataset", None] = None,
+                input_dataset_info: Union["DatasetInfo", None] = None,
+                input_dataset_id: Union[int, None] = None,
+                input_dataset_name: Union[str, None] = None,
+                algorithm_name: Union[str, None] = None,
+                algorithm_description: Union[str, None] = None,
+                algorithm_version: Union[str, None] = None,
+                run_name: Union[str, None] = None,
+                run_description: Union[str, None] = None,
+                algorithm_parameters: dict = {},
+                output_dataset_name: Union[str, None] = None,
+                output_dataset_description: Union[str, None] = None):
         """
         This is largely the core function of the database as most other
         functions in some way are passed through this function as to retain
@@ -945,7 +947,8 @@ class DatasetDatabase(object):
                 raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
         elif input_dataset_info is not None:
-            input = input_dataset_info.origin.get_dataset(input_dataset_info.id)
+            input = input_dataset_info.origin.get_dataset(
+                input_dataset_info.id)
         elif input_dataset_id is not None:
             input = self.get_dataset(id=input_dataset_id)
         else:
@@ -963,7 +966,8 @@ class DatasetDatabase(object):
             db = algorithm_parameters.pop("db", None)
             fms = algorithm_parameters.pop("fms", None)
 
-            alg_params_ds = self._create_dataset(algorithm_parameters,
+            alg_params_ds = self._create_dataset(
+                algorithm_parameters,
                 description="algorithm parameters")
 
             algorithm_parameters["db"] = db
@@ -971,7 +975,8 @@ class DatasetDatabase(object):
 
         # store params used
         else:
-            alg_params_ds = self._create_dataset(algorithm_parameters,
+            alg_params_ds = self._create_dataset(
+                algorithm_parameters,
                 description="algorithm parameters")
 
         # begin
@@ -993,39 +998,41 @@ class DatasetDatabase(object):
             output = output.ds
 
         # ingest output
-        output = self._create_dataset(output,
-             name=output_dataset_name,
-             description=output_dataset_description)
+        output = self._create_dataset(
+            output,
+            name=output_dataset_name,
+            description=output_dataset_description)
 
         # update run table
-        run_info = self._insert_to_table("Run",
-            {"AlgorithmId": alg_info["AlgorithmId"],
-             "UserId": self.user_info["UserId"],
-             "Name": run_name,
-             "Description": run_description,
-             "AlgorithmParameters": alg_params_ds.info.id,
-             "Begin": begin,
-             "End": end})
+        run_info = self._insert_to_table("Run", {
+            "AlgorithmId": alg_info["AlgorithmId"],
+            "UserId": self.user_info["UserId"],
+            "Name": run_name,
+            "Description": run_description,
+            "AlgorithmParameters": alg_params_ds.info.id,
+            "Begin": begin,
+            "End": end
+        })
 
         # update run input table
         if input.info is not None:
-            self._insert_to_table("RunInput",
-                {"RunId": run_info["RunId"],
-                 "DatasetId": input.info.id,
-                 "Created": end})
+            self._insert_to_table("RunInput", {
+                "RunId": run_info["RunId"],
+                "DatasetId": input.info.id,
+                "Created": end
+            })
 
         # update run output table
-        self._insert_to_table("RunOutput",
-            {"RunId": run_info["RunId"],
-             "DatasetId": output.info.id,
-             "Created": end})
+        self._insert_to_table("RunOutput", {
+            "RunId": run_info["RunId"],
+            "DatasetId": output.info.id,
+            "Created": end})
 
         return output
 
-
     def _create_dataset(self,
-        dataset: Union["Dataset", object],
-        **kwargs) -> "DatasetInfo":
+                        dataset: Union["Dataset", object],
+                        **kwargs) -> "DatasetInfo":
         # Hidden create dataset method used by the database to actually enforce
         # datasets are unique and exist. Additionally this is the function that
         # starts the dataset deconstruction and subsequent creation of a new
@@ -1080,8 +1087,7 @@ class DatasetDatabase(object):
             db=self.db, ds_info=ds_info)
 
         # attach info to a dataset
-        return Dataset(dataset = dataset.ds, ds_info = ds_info)
-
+        return Dataset(dataset=dataset.ds, ds_info=ds_info)
 
     def _upload_dataset(self, dataset, **params):
         # Hidden upload dataset function used by the process method to simply
@@ -1089,7 +1095,6 @@ class DatasetDatabase(object):
         # as a linked dataset.
 
         return dataset
-
 
     def upload_dataset(self, dataset: "Dataset", **kwargs) -> "DatasetInfo":
         """
@@ -1160,10 +1165,9 @@ class DatasetDatabase(object):
 
         return uploaded
 
-
     def get_dataset(self,
-        name: Union[str, None] = None,
-        id: Union[int, None] = None) -> "Dataset":
+                    name: Union[str, None] = None,
+                    id: Union[int, None] = None) -> "Dataset":
         """
         Pull and reconstruct a dataset from the database. Must provided either
         a dataset name or a dataset id to retrieve the dataset.
@@ -1242,10 +1246,9 @@ class DatasetDatabase(object):
 
         return Dataset(dataset=obj, ds_info=ds_info)
 
-
     def preview(self,
-        name: Union[str, None] = None,
-        id: Union[int, None] = None) -> "Dataset":
+                name: Union[str, None] = None,
+                id: Union[int, None] = None) -> "Dataset":
         """
         Pull and create summary info about a dataset from the database. Must
         provided either a dataset name or a dataset id to retrieve the dataset.
@@ -1352,11 +1355,14 @@ class DatasetDatabase(object):
                 "keys": keys,
                 "annotations": annotations}
 
-
     def get_items_from_table(self,
-        table: str,
-        conditions: List[Union[List[GENERIC_TYPES], GENERIC_TYPES]] = []) \
-        -> List[Dict[str, GENERIC_TYPES]]:
+                             table: str,
+                             conditions: List[
+                                Union[
+                                    List[GENERIC_TYPES],
+                                    GENERIC_TYPES
+                                ]
+                             ] = []):
         """
         Get items from a table that match conditions passed. Primarily a
         wrapper around orator's query functionality.
@@ -1406,14 +1412,13 @@ class DatasetDatabase(object):
 
         return tools.get_items_from_db_table(self.db, table, conditions)
 
-
     def _insert_to_table(self,
-        table: str,
-        items: Dict[str, GENERIC_TYPES]) -> Dict[str, GENERIC_TYPES]:
-        # Hidden insert to table function used to insert values to tables. Given
-        # a table name as a string and a dictionary with the items to insert as
-        # key = column name, and value = value, will insert the row into the
-        # table. Additionally it returns this created row.
+                         table: str,
+                         items: Dict[str, GENERIC_TYPES]):
+        # Hidden insert to table function used to insert values to tables.
+        # Given a table name as a string and a dictionary with the items to
+        # insert as key = column name, and value = value, will insert the row
+        # into the table. Additionally it returns this created row.
 
         # enforce types
         checks.check_types(table, str)
@@ -1421,14 +1426,13 @@ class DatasetDatabase(object):
 
         return tools.insert_to_db_table(self.db, table, items)
 
-
     def _purge_dataset(self,
-        name: Union[str, None] = None,
-        id: Union[int, None] = None):
+                       name: Union[str, None] = None,
+                       id: Union[int, None] = None):
         # Hidden purge dataset method that will simply remove the group dataset
-        # joins, the run output, run, and dataset rows related to a dataset name
-        # or id. If the dataset is used a run input the dataset will not be
-        # removed.
+        # joins, the run output, run, and dataset rows related to a dataset
+        # name or id. If the dataset is used a run input the dataset will not
+        # be removed.
 
         # enforce types
         checks.check_types(name, [str, type(None)])
@@ -1458,7 +1462,6 @@ class DatasetDatabase(object):
             self.db.table("Run").where("RunId", "=", run["RunId"]).delete()
         self.db.table("Dataset").where("DatasetId", "=", id).delete()
 
-
     @property
     def recent(self):
         print(("-" * 31) + " DATASET DATABASE " + ("-" * 31))
@@ -1483,7 +1486,6 @@ class DatasetDatabase(object):
             except (orator.exceptions.query.QueryException, KeyError) as e:
                 print("!package or schema not up to date!")
 
-
     def __str__(self):
         # basic print
         disp = "Recent Datasets:"
@@ -1500,7 +1502,6 @@ class DatasetDatabase(object):
             disp += ("\n" + str(dict(item)))
 
         return disp
-
 
     def __repr__(self):
         return str(self)
@@ -1563,14 +1564,14 @@ class DatasetInfo(object):
     """
 
     def __init__(self,
-        DatasetId: int,
-        Name: Union[str, None],
-        Introspector: str,
-        MD5: str,
-        SHA256: str,
-        Created: Union[datetime, str],
-        OriginDb: DatasetDatabase,
-        Description: Union[str, None] = None):
+                 DatasetId: int,
+                 Name: Union[str, None],
+                 Introspector: str,
+                 MD5: str,
+                 SHA256: str,
+                 Created: Union[datetime, str],
+                 OriginDb: DatasetDatabase,
+                 Description: Union[str, None] = None):
         # enforce types
         checks.check_types(DatasetId, int)
         checks.check_types(Name, [str, type(None)])
@@ -1598,59 +1599,50 @@ class DatasetInfo(object):
         # validate attributes
         self._validate_info()
 
-
     @property
     def id(self):
         return self._id
-
 
     @property
     def name(self):
         return self._name
 
-
     @property
     def description(self):
         return self._description
-
 
     @property
     def introspector(self):
         return self._introspector
 
-
     @property
     def md5(self):
         return self._md5
-
 
     @property
     def sha256(self):
         return self._sha256
 
-
     @property
     def created(self):
         return self._created
 
-
     @property
     def origin(self):
         return self._origin
-
 
     def _validate_info(self):
         # Hidden function used to validate that all the attributes passed do
         # actually exist and are the same in database.
 
         # get found
-        found = self.origin.get_items_from_table("Dataset",
-            [["MD5", "=", self.md5],
-             ["SHA256", "=", self.sha256]])
+        found = self.origin.get_items_from_table("Dataset", [
+            ["MD5", "=", self.md5],
+            ["SHA256", "=", self.sha256]
+        ])
 
         # assert that it exists by len(1)
         assert len(found) == 1, INVALID_DS_INFO
-
 
     def __str__(self):
         return str({"id": self.id,
@@ -1658,7 +1650,6 @@ class DatasetInfo(object):
                     "description": self.description,
                     "introspector": self.introspector,
                     "created": self.created})
-
 
     def __repr__(self):
         return str(self)
@@ -1732,11 +1723,11 @@ class Dataset(object):
     """
 
     def __init__(self,
-        dataset: Union[object, None] = None,
-        ds_info: Union[DatasetInfo, None] = None,
-        name: Union[str, None] = None,
-        description: Union[str, None] = None,
-        introspector: Union[Introspector, str, None] = None):
+                 dataset: Union[object, None] = None,
+                 ds_info: Union[DatasetInfo, None] = None,
+                 name: Union[str, None] = None,
+                 description: Union[str, None] = None,
+                 introspector: Union[Introspector, str, None] = None):
 
         # enforce types
         checks.check_types(dataset, [object, type(None)])
@@ -1809,11 +1800,9 @@ class Dataset(object):
         else:
             self.created = self.info.created
 
-
     @property
     def info(self):
         return self._info
-
 
     @property
     def ds(self):
@@ -1824,7 +1813,6 @@ class Dataset(object):
 
         return self.introspector.obj
 
-
     @property
     def validated(self):
         if self.info is None:
@@ -1832,26 +1820,21 @@ class Dataset(object):
 
         return True
 
-
     @property
     def introspector(self):
         return self._introspector
-
 
     @property
     def md5(self):
         return self._md5
 
-
     @property
     def sha256(self):
         return self._sha256
 
-
     @property
     def annotations(self):
         return self._annotations
-
 
     @property
     def state(self):
@@ -1867,7 +1850,6 @@ class Dataset(object):
                  "annotations": self.annotations}
 
         return state
-
 
     def validate(self, **kwargs):
         """
@@ -1894,7 +1876,8 @@ class Dataset(object):
 
         #### Parameters
         ##### **kwargs
-        All arguments given will be passed to the objects introspector validate.
+        All arguments given will be passed to the objects introspector
+        validate.
 
 
         #### Returns
@@ -1910,7 +1893,6 @@ class Dataset(object):
         # update hashes
         self._md5 = self.introspector.get_object_hash()
         self._sha256 = self.introspector.get_object_hash(hashlib.sha256)
-
 
     def store_files(self, **kwargs):
         """
@@ -1963,12 +1945,11 @@ class Dataset(object):
 
         # store
         self.apply(self.introspector.store_files,
-        algorithm_name = "dsdb.Dataset.store_files",
-        algorithm_version = VERSION,
-        output_dataset_name = self.name + " (FMS)",
-        output_dataset_description = self.description,
-        algorithm_parameters = params)
-
+                   algorithm_name="dsdb.Dataset.store_files",
+                   algorithm_version=VERSION,
+                   output_dataset_name=self.name + " (FMS)",
+                   output_dataset_description=self.description,
+                   algorithm_parameters=params)
 
     def upload_to(self, database: DatasetDatabase):
         """
@@ -2009,18 +1990,17 @@ class Dataset(object):
         # reassign self
         self._reassign_self(ds)
 
-
     def apply(self,
-        algorithm: Union[types.MethodType, types.FunctionType],
-        database: Union[DatasetDatabase, None] = None,
-        algorithm_name: Union[str, None] = None,
-        algorithm_description: Union[str, None] = None,
-        algorithm_version: Union[str, None] = None,
-        run_name: Union[str, None] = None,
-        run_description: Union[str, None] = None,
-        algorithm_parameters: dict = {},
-        output_dataset_name: Union[str, None] = None,
-        output_dataset_description: Union[str, None] = None):
+              algorithm: Union[types.MethodType, types.FunctionType],
+              database: Union[DatasetDatabase, None] = None,
+              algorithm_name: Union[str, None] = None,
+              algorithm_description: Union[str, None] = None,
+              algorithm_version: Union[str, None] = None,
+              run_name: Union[str, None] = None,
+              run_description: Union[str, None] = None,
+              algorithm_parameters: dict = {},
+              output_dataset_name: Union[str, None] = None,
+              output_dataset_description: Union[str, None] = None):
         """
         Apply an algorithm against a dataset. Given an algorithm (function or
         method), run the algorithm against the dataset and store the results in
@@ -2156,10 +2136,10 @@ class Dataset(object):
         # reassign self
         self._reassign_self(ds)
 
-
     def _reassign_self(self, ds: "Dataset"):
         # Hidden function to reassign all properties of a dataset to the return
-        # of another dataset. Primarily used after any approved malform dataset # operation.
+        # of another dataset. Primarily used after any approved malform dataset
+        # operation.
 
         # enforce types
         checks.check_types(ds, Dataset)
@@ -2172,7 +2152,6 @@ class Dataset(object):
         self._annotations = ds.annotations
         self._md5 = ds.md5
         self._sha256 = ds.md5
-
 
     @property
     def graph(self):
@@ -2188,7 +2167,6 @@ class Dataset(object):
             self.info.origin.display_dataset_graph(self.info.id)
         else:
             return NO_DS_INFO
-
 
     @property
     def connections(self):
@@ -2206,12 +2184,11 @@ class Dataset(object):
         else:
             return NO_DS_INFO
 
-
     def add_annotation(self, annotation: str):
         """
         Add an annotation to a dataset so that others know your notes regarding
         it. The dataset doesn't have to be attached to a database for this to
-        work however if it is, the annotations get sent to the database as well.
+        work however if it is, the annotations also get sent to the database.
 
         No object is returned, the current object is updated to reflect the
         changes made (if any).
@@ -2281,11 +2258,11 @@ class Dataset(object):
             if "AnnotationId" not in annotation:
                 anno_info = self.info.origin._insert_to_table(
                     "Annotation", annotation)
-                self.info.origin._insert_to_table("AnnotationDataset",
-                    {"AnnotationId": anno_info["AnnotationId"],
-                     "DatasetId": self.info.id,
-                     "Created": datetime.utcnow()})
-
+                self.info.origin._insert_to_table("AnnotationDataset", {
+                    "AnnotationId": anno_info["AnnotationId"],
+                    "DatasetId": self.info.id,
+                    "Created": datetime.utcnow()
+                })
 
     def save(self, path: Union[str, pathlib.Path]) -> pathlib.Path:
         """
@@ -2347,10 +2324,8 @@ class Dataset(object):
 
         return path
 
-
     def __str__(self):
         return str(self.state)
-
 
     def __repr__(self):
         state_str = ""

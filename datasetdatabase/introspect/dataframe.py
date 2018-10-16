@@ -20,8 +20,29 @@ from .introspector import Introspector
 
 class DataFrameIntrospector(Introspector):
     """
-    Pandas DataFrame introspector. Ingest a DataFrame, create and validate
-    Iota, etc.
+    Pandas DataFrame introspector. Ingest a DataFrame, validate, store files,
+    deconstruct, reconstruct, and package.
+
+    #### Example
+    ```
+    >>> DataFrameIntrospector(data)
+    <class datasetdatabase.introspect.dataframe.DataFrameIntrospector>
+
+    ```
+
+
+    #### Parameters
+    ##### obj: pd.DataFrame
+    The dataframe you want to validate and potentially store in a dataset
+    database.
+
+
+    #### Returns
+    ##### self
+
+
+    #### Errors
+
     """
 
     def __init__(self, obj: pd.DataFrame):
@@ -30,6 +51,10 @@ class DataFrameIntrospector(Introspector):
 
         # store obj and ensure index
         self._obj = obj.reset_index(drop=True)
+
+        # enforce column order
+        columns = sorted(self.obj.columns)
+        self._obj = self.obj.reindex(columns, axis=1)
 
         # set validated state
         self._validated = {"types": {k: False for k in self.obj.columns},
@@ -48,13 +73,49 @@ class DataFrameIntrospector(Introspector):
         return self._validated
 
 
-    def get_object_hash(self, alg=hashlib.md5):
+    def get_object_hash(self,
+        alg: types.BuiltinMethodType = hashlib.md5):
+        """
+        Get a unique and reproducible hash from the dataframe. DataFrame
+        hashing can be a bit tricky so this function is rather memory intensive
+        because it copies the bytes of every key-value pair in the dataframe
+        but this is in my opinion the best way to ensure a reproducible hash of
+        a dataset.
+
+        #### Example
+        ```
+        >>> df_introspector.get_object_hash()
+        asdf123asd3fhas2423dfhjkasd8f92178hb5sdf
+
+        >>> df_introspector.get_object_hash(hashlib.sha256)
+        8hkasdr823hklasdf7832balkjsdf73lkasdjhf73blkakljs892hksdf9
+
+        ```
+
+
+        #### Parameters
+        ##### alg: types.BuiltinMethodType = hashlib.md5
+        A hashing algorithm provided by hashlib.
+
+
+        #### Returns
+        ##### hash: str
+        The hexdigest of the object hash.
+
+
+        #### Errors
+
+        """
+
+        # create array
         barray = []
 
+        # fill array with byte values of every key-value pair
         for i, row in self.obj.iterrows():
             for key, val in row.items():
                 barray.append(pickle.dumps({key: val}))
 
+        # return hexdigest of array
         return tools.get_object_hash(barray, alg=alg)
 
 
