@@ -428,6 +428,14 @@ def reconstruct(db: orator.DatabaseManager,
     group_datasets = tools.get_items_from_db_table(
         db, "GroupDataset", ["DatasetId", "=", ds_info.id])
 
+    # get iota_groups
+    iota_groups = db.table("IotaGroup").where_in(
+        "GroupId",
+        [g["GroupId"] for g in group_datasets]
+    ).get()
+
+    return pd.DataFrame([dict(r) for r in iota_groups])
+
     # create groups
     print("Reconstructing dataset...")
     bar = ProgressBar(len(group_datasets))
