@@ -4,7 +4,6 @@
 import orator
 
 # self
-from ..schema import tables
 from ..utils import checks
 
 

@@ -422,43 +422,35 @@ def _reconstruct_group(group_dataset, database, progress_bar):
     return group
 
 
-def reconstruct(db: orator.DatabaseManager,
-    ds_info: "DatasetInfo") -> pd.DataFrame:
-    # create group_datasets
-    group_datasets = tools.get_items_from_db_table(
-        db, "GroupDataset", ["DatasetId", "=", ds_info.id])
+def reconstruct(
+    db: orator.DatabaseManager,
+    ds_info: "DatasetInfo"
+) -> pd.DataFrame:
 
-    # get iota_groups
-    iota_groups = db.table("IotaGroup").where_in(
-        "GroupId",
-        [g["GroupId"] for g in group_datasets]
-    ).get()
+    # get all iota that match
+    data = [
+        dict(r) for r in db.table("Iota")
+        .join("IotaGroup", "IotaGroup.IotaId", "=", "Iota.IotaId")
+        .join("GroupDataset", "GroupDataset.GroupId", "=", "IotaGroup.GroupId")
+        .join("Dataset", "GroupDataset.DatasetId", "=", "Dataset.DatasetId")
+        .where("Dataset.DatasetId", "=", ds_info.id)
+        .get()
+    ]
 
-    return pd.DataFrame([dict(r) for r in iota_groups])
+    # create dictionary of iota with key being their group label
+    groups = {}
+    for iota in data:
+        label = int(iota["Label"])
+        if label not in groups:
+            groups[label] = {}
 
-    # create groups
-    print("Reconstructing dataset...")
-    bar = ProgressBar(len(group_datasets))
+        groups[label][iota["Key"]] = pickle.loads(iota["Value"])
 
-    # create func
-    func = partial(_reconstruct_group, database=db, progress_bar=bar)
+    # we know that dataframe labels are actually just their index value
+    # so we can append these rows in order by simply looping through a range of their length and getting each one
+    rows = []
+    for i in range(len(groups)):
+        rows.append(groups[i])
 
-    # get safe thread count
-    if "DSDB_PROCESS_LIMIT" in os.environ:
-        n_threads = int(os.environ["DSDB_PROCESS_LIMIT"])
-    else:
-        n_threads = os.cpu_count()
-
-    # create pool
-    with Pool(n_threads) as pool:
-        # map pool
-        rows = pool.map(func, group_datasets)
-
-    # sort
-    df = pd.DataFrame(rows)
-    df = df.sort_values(by="__DSDB_GROUP_LABEL__")
-    df = df.drop(labels="__DSDB_GROUP_LABEL__", axis=1)
-    df = df.reset_index(drop=True)
-
-    # return dataframe
-    return df
+    # return frame
+    return pd.DataFrame(rows)
