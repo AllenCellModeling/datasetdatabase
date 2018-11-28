@@ -9,10 +9,13 @@ Dataset Database (dsdb) is a python package for handling arbitrary datasets (or 
 ## Documentation
 [https://allencellmodeling.gitbook.io/datasetdatabase/](https://allencellmodeling.gitbook.io/datasetdatabase/)
 
+
 ***Full Versioning, Deduplication, Validation, and Tracking of Arbitrary Datasets***
 ![dataset network graph](./docs/resources/dataset_graph.png)
 
 ---
+
+The quick start guide can be found [here](./docs/quickstart.md).
 
 There are three core functions for using a dataset database:
 
