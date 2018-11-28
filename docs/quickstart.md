@@ -48,7 +48,9 @@ After you set up your credentials, in Python you can get a dsdb object as follow
 
 ```python
 import datasetdatabase as dsdb  
-my_database = dsdb.DatasetDatabase(config='~/.config_dsdb', user='<the first part of your email>', processing_limit=30)
+my_database = dsdb.DatasetDatabase(config='~/.config_dsdb', 
+                                   user='<the first part of your email>', 
+                                   processing_limit=30)
 ```
 
 ## Getting data
@@ -155,7 +157,9 @@ Then you can upload it with your connection to dsdb:
 
 ```python
 
-my_database = dsdb.DatasetDatabase(config='~/.config_dsdb', user='<the first part of your email>', processing_limit=30)
+my_database = dsdb.DatasetDatabase(config='~/.config_dsdb', 
+                                   user='<the first part of your email>', 
+                                   processing_limit=30)
 my_database.upload_to(ds)
 
 ```
