@@ -1,4 +1,4 @@
-# ikkeDB
+# nonameDB
 
 ### Index
 1. [General Operations](#general-operations)
@@ -24,14 +24,14 @@
 
 ## General Operations
 ### Connect
-`db = ikke.connect(config)`
+`db = noname.connect(config)`
 
 Create an object that acts as a mechanism to store, retrieve, preview, discover, and track the history of various objects.
 
 ## Create
-`ds = ikke.Dataset(obj)`
+`ds = noname.Dataset(obj)`
 
-Create an immutable copy of the object that other `ikke` operations can then run against. If the object passed into the Dataset is a
+Create an immutable copy of the object that other `noname` operations can then run against. If the object passed into the Dataset is a
 known type, during storage and retrieval the object will be stored and rebuilt from its Iota blocks. If it isn't a known type it will be
 serialized and stored in full. The benefits of deconstruction to Iota are the drastic storage cost reduction due to potential deduplication,
 dataset discovery from Iota searching, and if setup, supporting file deduplication.
@@ -133,9 +133,10 @@ unless explicitly overridden. Of note, these packages can also be imported using
 ## Database Deployment
 ### Setup
 ```
-docker run --it ikkeDB \
+docker run --it nonameDB \
     -v /connected/storage:/database/storage
 ```
 
 
 ### FMS
+There is a basic FMS built in with the database system that can store any supporting files used in a dataset.
