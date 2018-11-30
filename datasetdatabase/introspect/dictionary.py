@@ -28,16 +28,13 @@ class DictionaryIntrospector(Introspector):
         self._obj = obj
         self._validated = {k: False for k in self.obj}
 
-
     @property
     def obj(self):
         return self._obj
 
-
     @property
     def validated(self):
         return self._validated
-
 
     def get_object_hash(self, alg=hashlib.md5):
         barray = []
@@ -48,22 +45,20 @@ class DictionaryIntrospector(Introspector):
 
         return tools.get_object_hash(barray, alg=alg)
 
-
-    def validate(self,
-        item_validation_map: Union[None,
-            Dict[str, Union[types.ModuleType, types.FunctionType]]] = None):
+    def validate(
+        self,
+        item_validation_map: Union[None, Dict[str, Union[types.ModuleType, types.FunctionType]]] = None
+    ):
 
         # enforce types
         checks.check_types(item_validation_map, [dict, type(None)])
 
         # validate
         if item_validation_map is not None:
-            new_validations = {k: self.validate_key(k, item_validation_map[k])
-                                for k in item_validation_map}
+            new_validations = {k: self.validate_key(k, item_validation_map[k]) for k in item_validation_map}
             self._validated = {**self._validated, **new_validations}
 
-
-    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo", fms: FMSInterface):
         # all iota are created at the same time
         created = datetime.utcnow()
 
@@ -119,12 +114,13 @@ class DictionaryIntrospector(Introspector):
             # update progress
             bar.increment()
 
-
-    def store_files(self,
+    def store_files(
+        self,
         dataset: "Dataset",
         db: orator.DatabaseManager,
         fms: FMSInterface,
-        keys: Union[str, List[str], None] = None):
+        keys: Union[str, List[str], None] = None
+    ):
         # enforce types
         checks.check_types(db, orator.DatabaseManager)
         checks.check_types(fms, FMSInterface)
@@ -148,24 +144,26 @@ class DictionaryIntrospector(Introspector):
 
         return self.obj
 
-
     def package(self):
         package = {}
         package["data"] = self.obj
         package["files"] = None
         return package
 
-
-    def validate_key(self,
+    def validate_key(
+        self,
         key: str,
-        func: Union[types.ModuleType, types.FunctionType]) -> bool:
+        func: Union[types.ModuleType, types.FunctionType]
+    ) -> bool:
 
         return func(self.obj[key])
 
 
-def reconstruct(db: orator.DatabaseManager,
+def reconstruct(
+    db: orator.DatabaseManager,
     ds_info: "DatasetInfo",
-    in_order: bool = False) -> dict:
+    fms: FMSInterface
+) -> dict:
     # create group_datasets
     group_datasets = tools.get_items_from_db_table(
         db, "GroupDataset", ["DatasetId", "=", ds_info.id])

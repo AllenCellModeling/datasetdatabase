@@ -62,19 +62,15 @@ class DataFrameIntrospector(Introspector):
                            "files": False}
         self.filepath_columns = None
 
-
     @property
     def obj(self):
         return self._obj
-
 
     @property
     def validated(self):
         return self._validated
 
-
-    def get_object_hash(self,
-        alg: types.BuiltinMethodType = hashlib.md5):
+    def get_object_hash(self, alg: types.BuiltinMethodType = hashlib.md5):
         """
         Get a unique and reproducible hash from the dataframe. DataFrame
         hashing can be a bit tricky so this function is rather memory intensive
@@ -118,8 +114,7 @@ class DataFrameIntrospector(Introspector):
         # return hexdigest of array
         return tools.get_object_hash(barray, alg=alg)
 
-
-    def _format_dataset(self, type_map = None):
+    def _format_dataset(self, type_map=None):
         # enforce types
         checks.check_types(type_map, [dict, type(None)])
 
@@ -127,13 +122,10 @@ class DataFrameIntrospector(Introspector):
         if type_map is not None:
             bar = ProgressBar(len(self.obj) * len(type_map))
             for key, ctype in type_map.items():
-                self.obj[key] = self.obj[key].apply(
-                    lambda v: bar.apply_and_update(tools.quick_cast,
-                            value=v, cast_type=ctype, info="column: " + key))
+                self.obj[key] = self.obj[key].apply(lambda v: bar.apply_and_update(
+                    tools.quick_cast, value=v, cast_type=ctype, info="column: " + key))
 
-
-    def coerce_types_using_map(self,
-        type_map: Union[Dict[str, type], None] = None):
+    def coerce_types_using_map(self, type_map: Union[Dict[str, type], None] = None):
         # enforce types
         checks.check_types(type_map, [dict, type(None)])
 
@@ -148,8 +140,7 @@ class DataFrameIntrospector(Introspector):
         self._validated["types"] = {**self._validated["types"],
                                     **{k: False for k in type_map}}
 
-
-    def _validate_dataset_types(self, type_map = None):
+    def _validate_dataset_types(self, type_map=None):
         # enforce types
         checks.check_types(type_map, [dict, type(None)])
 
@@ -161,13 +152,9 @@ class DataFrameIntrospector(Introspector):
             bar = ProgressBar(len(self.obj) * len(type_map))
             for key, ctype in type_map.items():
                 err = err.format(c=key)
-                self.obj[key].apply(
-                lambda x: bar.apply_and_update(checks.check_types,
-                                               var=x, allowed=ctype, err=err))
+                self.obj[key].apply(lambda x: bar.apply_and_update(checks.check_types, var=x, allowed=ctype, err=err))
 
-
-    def enforce_types_using_map(self,
-        type_map: Union[Dict[str, type], None] = None):
+    def enforce_types_using_map(self, type_map: Union[Dict[str, type], None] = None):
         # enforce types
         checks.check_types(type_map, [dict, type(None)])
 
@@ -180,8 +167,7 @@ class DataFrameIntrospector(Introspector):
         self._validated["types"] = {**self._validated["types"],
                                     **{k: True for k in type_map}}
 
-
-    def _validate_dataset_values(self, validation_map = None):
+    def _validate_dataset_values(self, validation_map=None):
         # enforce types
         checks.check_types(validation_map, [dict, type(None)])
 
@@ -192,14 +178,12 @@ class DataFrameIntrospector(Introspector):
         if validation_map is not None:
             bar = ProgressBar(len(self.obj) * len(validation_map))
             for key, func in validation_map.items():
-                self.obj[key].apply(
-                lambda x: bar.apply_and_update(tools._assert_value,
-                                        f=func, val=x, err=err.format(c=key)))
+                self.obj[key].apply(lambda x: bar.apply_and_update(tools._assert_value, f=func, val=x, err=err.format(c=key)))
 
-
-    def enforce_values_using_map(self,
-        value_validation_map: Union[Dict[str, types.FunctionType], None] \
-            = None):
+    def enforce_values_using_map(
+        self,
+        value_validation_map: Union[Dict[str, types.FunctionType], None] = None
+    ):
         # enforce types
         checks.check_types(value_validation_map, [dict, type(None)])
 
@@ -212,7 +196,6 @@ class DataFrameIntrospector(Introspector):
         self._validated["values"] = {**self._validated["values"],
                                      **{k: True for k in value_validation_map}}
 
-
     def _validate_dataset_files(self):
         err = "Dataset file not found at:\n\tcolumn: {c}"
 
@@ -224,9 +207,7 @@ class DataFrameIntrospector(Introspector):
                     lambda x: bar.apply_and_update(
                         checks.check_file_exists, f=x, err=err))
 
-
-    def enforce_files_exist_from_columns(self,
-        filepath_columns: Union[str, List[str], None] = None):
+    def enforce_files_exist_from_columns(self, filepath_columns: Union[str, List[str], None] = None):
         # enforce types
         checks.check_types(filepath_columns, [str, list, type(None)])
 
@@ -257,12 +238,13 @@ class DataFrameIntrospector(Introspector):
                 # update validated
                 self._validated["files"] = False
 
-
-    def store_files(self,
+    def store_files(
+        self,
         dataset: "Dataset",
         db: orator.DatabaseManager,
         fms: FMSInterface,
-        filepath_columns: Union[str, List[str], None] = None):
+        filepath_columns: Union[str, List[str], None] = None
+    ):
 
         # enforce types
         checks.check_types(db, orator.DatabaseManager)
@@ -283,12 +265,13 @@ class DataFrameIntrospector(Introspector):
 
         return self.obj
 
-
-    def validate(self,
+    def validate(
+        self,
         type_validation_map: Union[Dict[str, type], None] = None,
         value_validation_map: Union[Dict[str, types.FunctionType], None] = None,
         filepath_columns: Union[List[str], str, None] = None,
-        import_as_type_map: bool = False):
+        import_as_type_map: bool = False
+    ):
         # coerce
         if import_as_type_map:
             self.coerce_types_using_map(type_validation_map)
@@ -301,8 +284,7 @@ class DataFrameIntrospector(Introspector):
         if filepath_columns is not None:
             self.enforce_files_exist_from_columns(filepath_columns)
 
-
-    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo", fms: FMSInterface):
         # create bar
         bar = ProgressBar(len(self.obj))
 
@@ -395,36 +377,10 @@ def _deconstruct_Group(row, database, ds_info, progress_bar):
     progress_bar.increment()
 
 
-def _reconstruct_group(group_dataset, database, progress_bar):
-    # create iota_groups
-    iota_groups = tools.get_items_from_db_table(
-        database, "IotaGroup", ["GroupId", "=", group_dataset["GroupId"]])
-
-    # get label
-    label = int(float(group_dataset["Label"]))
-
-    # create group
-    group = {}
-    for iota_group in iota_groups:
-        # create iota
-        iota = tools.get_items_from_db_table(
-            database, "Iota", ["IotaId", "=", iota_group["IotaId"]])[0]
-
-        # read value and attach to group
-        group[iota["Key"]] = pickle.loads(iota["Value"])
-
-        # attach label for reorder
-        group["__DSDB_GROUP_LABEL__"] = label
-
-    # update progress
-    progress_bar.increment()
-
-    return group
-
-
 def reconstruct(
     db: orator.DatabaseManager,
-    ds_info: "DatasetInfo"
+    ds_info: "DatasetInfo",
+    fms: FMSInterface
 ) -> pd.DataFrame:
 
     # get all iota that match

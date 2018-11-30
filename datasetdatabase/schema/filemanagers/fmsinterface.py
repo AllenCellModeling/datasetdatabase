@@ -12,20 +12,15 @@ class FMSInterface(abc.ABC):
     def __init__(self, **kwargs):
         return
 
-
     @property
     @abc.abstractmethod
     def table_name(self):
         return
 
-
     @abc.abstractmethod
     def create_File(self, schema: orator.Schema):
         return
 
-
     @abc.abstractmethod
-    def get_or_create_file(self,
-        filepath: Union[str, pathlib.Path],
-        metadata: Union[dict, None] = None):
+    def get_or_create_file(self, filepath: Union[str, pathlib.Path], metadata: Union[dict, None] = None):
         return

@@ -60,7 +60,7 @@ class Introspector(abc.ABC):
         self._validated = True
 
     @abc.abstractmethod
-    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo"):
+    def deconstruct(self, db: orator.DatabaseManager, ds_info: "DatasetInfo", fms: "FMSInterface"):
         """
         Generate and insert all Iota, Group, IotaGroup, and GroupDataset items
         to the database passed using the ds_info passed when needed on things
@@ -85,8 +85,7 @@ class Introspector(abc.ABC):
 
 
 @abc.abstractmethod
-def reconstruct(db: orator.DatabaseManager,
-                ds_info: "DatasetInfo") -> object:
+def reconstruct(db: orator.DatabaseManager, ds_info: "DatasetInfo", fms: "FMSInterface") -> object:
     """
     Do the reverse operation of the deconstruct and when given a database link
     and a dataset info, reconstruct the object and return it.
