@@ -1083,8 +1083,7 @@ class DatasetDatabase(object):
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
         # deconstruct
-        dataset.introspector.deconstruct(
-            db=self.db, ds_info=ds_info)
+        dataset.introspector.deconstruct(db=self.db, ds_info=ds_info, fms=self.constructor.fms)
 
         # attach info to a dataset
         return Dataset(dataset=dataset.ds, ds_info=ds_info)
@@ -1241,8 +1240,7 @@ class DatasetDatabase(object):
             raise ValueError(TOO_MANY_RETURN_VALUES.format(n=1))
 
         # reconstruct object
-        obj = RECONSTRUCTOR_MAP[ds_info.introspector](
-            db=self.db, ds_info=ds_info)
+        obj = RECONSTRUCTOR_MAP[ds_info.introspector](db=self.db, ds_info=ds_info, fms=self.constructor.fms)
 
         return Dataset(dataset=obj, ds_info=ds_info)
 

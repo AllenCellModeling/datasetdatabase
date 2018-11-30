@@ -9,9 +9,7 @@ import hashlib
 import orator
 import quilt
 import yaml
-import json
 import uuid
-import sys
 import os
 
 # self
@@ -26,8 +24,7 @@ STORAGE_LOCATION_IS_NOT_DIR = "Storage location must be an existing directory."
 
 
 class QuiltFMS(FMSInterface):
-    def __init__(self,
-        connection_options: Union[dict, None] = None):
+    def __init__(self, connection_options: Union[dict, None] = None):
 
         # enforce types
         checks.check_types(connection_options, [dict, type(None)])
@@ -36,23 +33,19 @@ class QuiltFMS(FMSInterface):
         if connection_options is None:
             self._connection_options = CONNECTION_OPTIONS
         else:
-            self._connection_options = {**CONNECTION_OPTIONS,
-                                       **connection_options}
+            self._connection_options = {**CONNECTION_OPTIONS, **connection_options}
 
         # update storage user
         self.storage_user = self._connection_options["user"]
         self.set_storage_location(self._connection_options["storage_location"])
 
-
     @property
     def table_name(self):
         return "File"
 
-
     @property
     def storage_location(self):
         return self._storage_location
-
 
     def create_File(self, schema: orator.Schema):
         # enforce types
@@ -70,9 +63,7 @@ class QuiltFMS(FMSInterface):
                 table.string("Metadata").nullable()
                 table.datetime("Created")
 
-
-    def set_storage_location(self,
-        storage_location: Union[str, pathlib.Path, None]):
+    def set_storage_location(self, storage_location: Union[str, pathlib.Path, None]):
         # enforce types
         checks.check_types(storage_location,
                            [str, pathlib.Path, type(None)])
@@ -89,13 +80,14 @@ class QuiltFMS(FMSInterface):
             os.environ["QUILT_PRIMARY_PACKAGE_DIR"] = str(self.storage_location)
             os.environ["QUILT_PACKAGE_DIRS"] = str(self.storage_location)
 
-
-    def get_file(self,
+    def get_file(
+        self,
         db: orator.DatabaseManager,
         filepath: Union[str, pathlib.Path, None] = None,
         readpath: Union[str, pathlib.Path, None] = None,
         md5: Union[str, None] = None,
-        sha256: Union[str, None] = None) -> Union[str, None]:
+        sha256: Union[str, None] = None
+    ) -> Union[str, None]:
         # enforce types
         checks.check_types(db, orator.DatabaseManager)
         checks.check_types(filepath, [str, pathlib.Path, type(None)])
@@ -105,9 +97,9 @@ class QuiltFMS(FMSInterface):
 
         # enforce at least one parameter given
         assert filepath is not None or \
-               readpath is not None or \
-               md5 is not None or \
-               sha256 is not None, \
+            readpath is not None or \
+            md5 is not None or \
+            sha256 is not None, \
             "Provide filepath, an fms provided readpath, or a file hash."
 
         # try to find the fileid
@@ -130,11 +122,31 @@ class QuiltFMS(FMSInterface):
 
         return found
 
+    def get_or_create_object(
+        self,
+        db: orator.DatabaseManager,
+        obj: object,
+        metadata: Union[str, dict, None] = None
+    ) -> dict:
 
-    def get_or_create_file(self,
+        # write an object to a pickle file
+        tmp = tools.write_pickle(obj, "dsdb_intermediate_file.pkl")
+
+        # store this file
+        file_info = self.get_or_create_file(db, tmp, metadata)
+
+        # remove the intermediate
+        os.remove(tmp)
+
+        # return the fms store info
+        return file_info
+
+    def get_or_create_file(
+        self,
         db: orator.DatabaseManager,
         filepath: Union[str, pathlib.Path],
-        metadata: Union[str, dict, None] = None) -> dict:
+        metadata: Union[str, dict, None] = None
+    ) -> dict:
 
         # enforce types
         checks.check_types(db, orator.DatabaseManager)
@@ -182,14 +194,11 @@ class QuiltFMS(FMSInterface):
             "Created": datetime.utcnow()}
 
         # insert
-        file_id = db.table("File").insert(file_info)
+        db.table("File").insert(file_info)
 
         return file_info
 
-
-    def _build_file_as_package(self,
-        filepath: Union[str, pathlib.Path],
-        package_name: str) -> str:
+    def _build_file_as_package(self, filepath: Union[str, pathlib.Path], package_name: str) -> str:
         # enforce types
         checks.check_types(filepath, [str, pathlib.Path])
         checks.check_types(package_name, str)
