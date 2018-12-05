@@ -9,6 +9,8 @@
 5. [Planned API](#planned-api)
 
 ## Planned API
+While there will be plenty of supporting functions that accompany this package, the following functions are aimed at the users, not the developers or maintainers of the database that supports the `dslib` operations.
+
 1. [Core](#core-requirements)
     1. [Connect](#connect)
     2. [Create](#create)
@@ -82,7 +84,7 @@ Find all datasets that contain a specific `Iota`. Key and Value can be put in no
 Purge a dataset from the database. Available to the owners/ admins of datasets, when a dataset is no longer being actively used, it is best practice to purge the dataset from the database, this will remove all the sub-dataset objects from the database while keeping the high level and metadata information; removes `Iota` and `Group`, but keeps Dataset, Run, and Annotation items. Optionally, you may request to purge the entire tree of a datasets history. If so, the described operation will occur for all datasets found to be linked to the targeted hash unless it is the true origin (the originally uploaded dataset). The true origin dataset must be purged with `force=True`.
 
 #### Export
-`package = ds.package()`
+`package = ds.package(name)`
 
 Export the dataset as a Quilt/T4 package for others to use. This will gather all supporting files and metadata and construct documentation for you unless explicitly overridden. Of note, these packages can also be imported using the `db.upload` and the system will unpack the contents for you.
 
@@ -102,7 +104,7 @@ Decouple two datasets from one another. Much like the `db.purge` and the `db.cou
 Graph the connections/ processing history of a dataset. This is not a graph of information sharing between datasets, this function returns an archive of how datasets are linked together, either from `db.link` or `ds.apply` operations.
 
 ### Future
-These functions will be delivered after the "release" v2.0. While these have been shown to be useful, the are not widely used and do not *yet* provide the benefit I believed they will.
+These functions will be delivered after the "release" v2.0. While these have been shown to be useful, the are not widely used and do not *yet* provide the benefit I believed they would.
 
 #### Apply
 `ds = ds.apply(callable, parameters)`
@@ -110,6 +112,6 @@ These functions will be delivered after the "release" v2.0. While these have bee
 Apply any callable to a dataset and pass any additional parameters that should be passed along to the callable. This will attempt to run the callable against the underlying object contained in the dataset and store the results as a new dataset. However, at any point during this operation, if any error arises, whether during the runtime of the passed callable, or during the upload of metadata, parameters, or created object, this will error out with full traceback and the database will rollback any transaction. In the case of success, multiple objects will have been created and stored. The first of which will be a Dockerfile that can be used to rerun this apply step if the callable is "simple" enough. Usually "simple" means: "doesn't require specific device drivers". Additionally, the parameters passed to the callable will also be stored as a dataset in the database. All run information will be stored and the two datasets and parameters will be linked together. It is important to note however, that the hashes for the input dataset, the generated Dockerfile, and the passed parameters dataset make up the unique index assigned to a run and if this unique index already exists, the results of the previously computed run will be returned instead of the apply running to completion. This functionality can be explicitly overridden.
 
 #### Rehydrate
-`ds = db.rehydrate(origin, destination)`
+`ds = db.rehydrate(origin_hash, destination_hash)`
 
 Rehydrate a dataset that has previously been purged. This will rehydrate all stepping stone datasets along the way as the system needs. Rehydrate, in this context, means to reconstruct, store, all Iota, Group, and their associated Junction items, as well as apply the Dockerfiles stored previously if needed.
