@@ -166,6 +166,7 @@ def main():
     # quick exit
     if not args.generate_datasets and not args.generate_database:
         print("No reports to generate.")
+        return
 
     # create database connection
     db = dsdb.DatasetDatabase(config=args.config, processing_limit=args.threads)
@@ -187,9 +188,6 @@ def main():
     # check destination folder
     if not args.dest_folder.is_dir():
         args.dest_folder.mkdir()
-
-    from pprint import pprint
-    pprint(report)
 
     # create the report
     utc = str(datetime.utcnow()).replace(" ", "_")
