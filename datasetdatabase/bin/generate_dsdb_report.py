@@ -45,7 +45,7 @@ class Args(object):
                        help="The number of iterations to ")
         p.add_argument("--no-database", "-no-db", dest="generate_database", action="store_false",
                        help="Do not create a database report.")
-        p.add_argument("--allocated_threads", "-t", dest="threads", action="store", type=int, default=36,
+        p.add_argument("--allocated_threads", "-t", dest="threads", action="store", type=int, default=1,
                        help="Number of threads to use when communicating with the database server.")
 
         p.parse_args(namespace=self)
