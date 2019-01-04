@@ -147,7 +147,7 @@ def generate_database(args: Args, db: dsdb.DatasetDatabase):
     return db_report
 
 
-def generate_cpu_network():
+def generate_cpu_network(args: Args):
     # get cpu freqs
     freqs = psutil.cpu_freq(True)
 
@@ -155,7 +155,8 @@ def generate_cpu_network():
         "cpu_frequencies": [{"min": freq.min, "max": freq.max, "current": freq.current} for freq in freqs],
         "logical_count": psutil.cpu_count(),
         "physical_count": psutil.cpu_count(False),
-        "max_gbit_bandwidth": (psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv) / 1024.0 / 1024.0 / 1024.0 * 8.0
+        "max_gbit_bandwidth": (psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv) / 1024.0 / 1024.0 / 1024.0 * 8.0,
+        "allocated_threads": args.threads
     }
 
 
