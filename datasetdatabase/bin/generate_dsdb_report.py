@@ -184,7 +184,7 @@ def main():
         report["database_results"] = generate_database(args, db)
 
     # add basic stats
-    report["cpu_net_results"] = generate_cpu_network()
+    report["cpu_net_results"] = generate_cpu_network(args)
 
     # check destination folder
     if not args.dest_folder.is_dir():
@@ -196,7 +196,3 @@ def main():
     filename = "dsdb_report.{}.json".format(utc)
     with open(args.dest_folder / filename, "w") as write_out:
         json.dump(report, write_out)
-
-
-if __name__ == "__main__":
-    main()
