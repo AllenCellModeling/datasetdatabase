@@ -57,19 +57,23 @@ MAJOR = _version_major
 MINOR = _version_minor
 MICRO = _version_micro
 VERSION = __version__
-REQUIRES = ["numpy",
+REQUIRES = ["tqdm",
+            "numpy",
             "quilt",
             "pandas",
             "orator",
+            "psutil",
             "networkx",
             "pathlib",
             "matplotlib",
             "sqlalchemy",
             "psycopg2_binary"]
-INSTALLS = ["numpy>=1.15.1",
+INSTALLS = ["tqdm>=4.28.1",
+            "numpy>=1.15.1",
             "quilt>=2.9.10",
             "pandas>=0.23.4",
             "orator>=0.9.7",
+            "psutil==5.4.8",
             "networkx>=2.1",
             "pathlib>=1.0.1",
             "matplotlib>=2.2.3",

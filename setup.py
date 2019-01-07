@@ -27,6 +27,11 @@ opts = dict(name=NAME,
             platforms=PLATFORMS,
             version=VERSION,
             packages=PACKAGES,
+            entry_points={
+                "console_scripts": [
+                    "generate_dsdb_report=datasetdatabase.bin.generate_dsdb_report:main"
+                ]
+            },
             install_requires=INSTALLS,
             requires=REQUIRES,
             scripts=SCRIPTS)
