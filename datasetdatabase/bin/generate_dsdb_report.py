@@ -4,6 +4,9 @@
 Generate a report for a DatasetDatabase that includes things such as average time to pull each dataset, current size of tables, etc.
 """
 
+# pg size
+# 3866704408
+
 # standard
 import argparse
 from datetime import datetime
@@ -11,7 +14,9 @@ import json
 import math
 import os
 from pathlib import Path
+import pickle
 import random
+import sys
 import time
 
 # installed
@@ -49,6 +54,25 @@ class Args(object):
                        help="Number of threads to use when communicating with the database server.")
 
         p.parse_args(namespace=self)
+
+
+def get_dataset_storage_size(ds: dsdb.Dataset, file_store: Path):
+    # attempt to store the dataset as csv or pickle
+    try:
+        ds.ds.to_csv(file_store)
+    except Exception as e:
+        try:
+            with open(file_store, "wb") as write_out:
+                pickle.dump(ds.ds, write_out)
+        except Exception as e:
+            storage_cost = sys.getsizeof(ds.ds)
+
+    # remove the file
+    if file_store.is_file():
+        storage_cost = file_store.stat().st_size
+        file_store.unlink()
+
+    return storage_cost
 
 
 def generate_datasets(args: Args, db: dsdb.DatasetDatabase):
@@ -93,8 +117,19 @@ def generate_datasets(args: Args, db: dsdb.DatasetDatabase):
                     # compute duration
                     duration = time.time() - start
 
+                    # get storage cost
+                    file_store = args.dest_folder / "test.dataset"
+                    storage_cost = get_dataset_storage_size(ds, file_store)
+
                     # create dataset iteration result
-                    result = {"trial": i, "info": datasets[ds_id], "duration": duration, "iota": ds.ds.shape[0] * ds.ds.shape[1]}
+                    result = {
+                        "trial": i,
+                        "info": datasets[ds_id],
+                        "duration": duration,
+                        "iota": ds.ds.shape[0] * ds.ds.shape[1],
+                        "storage_cost": storage_cost,
+                        "memory_cost": sys.getsizeof(ds.ds)
+                    }
 
                     # append to report
                     if ds_id in ds_report:
@@ -113,6 +148,8 @@ def generate_datasets(args: Args, db: dsdb.DatasetDatabase):
 
         ds_report[ds] = {
             "iota": ds_report[ds][0]["iota"],
+            "storage_cost": ds_report[ds][0]["storage_cost"],
+            "memory_cost": ds_report[ds][0]["memory_cost"],
             "average_duration": (sum(durations) / len(durations)),
             "observed_durations": durations,
             "observed_duration_variance": np.var(durations)
@@ -133,7 +170,7 @@ def generate_datasets(args: Args, db: dsdb.DatasetDatabase):
     return {"datasets": ds_report, "weights": weights}
 
 
-def generate_database(args: Args, db: dsdb.DatasetDatabase):
+def generate_database(args: Args, db: dsdb.DatasetDatabase, ds_report: dict = None):
     # create database portion of report
     db_report = {}
 
@@ -143,6 +180,10 @@ def generate_database(args: Args, db: dsdb.DatasetDatabase):
     db_report["group"] = {"count": db.db.table("Group").count()}
     db_report["iota_group"] = {"count": db.db.table("IotaGroup").count()}
     db_report["iota"] = {"count": db.db.table("Iota").count()}
+
+    # compute deduplication gain
+    if ds_report:
+        db_report["iota_deduplication"] = db_report["iota"]["count"] / sum([ds_report["datasets"][ds]["iota"] for ds in ds_report["datasets"]])
 
     return db_report
 
@@ -155,7 +196,7 @@ def generate_cpu_network(args: Args):
         "cpu_frequencies": [{"min": freq.min, "max": freq.max, "current": freq.current} for freq in freqs],
         "logical_count": psutil.cpu_count(),
         "physical_count": psutil.cpu_count(False),
-        "max_gbit_bandwidth": (psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv) / 1024.0 / 1024.0 / 1024.0 * 8.0,
+        "bandwidth": (psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv),
         "allocated_threads": args.threads
     }
 
@@ -176,12 +217,14 @@ def main():
     report = {}
 
     # run datasets portion
+    ds_report = None
     if args.generate_datasets:
-        report["dataset_results"] = generate_datasets(args, db)
+        ds_report = generate_datasets(args, db)
+        report["dataset_results"] = ds_report
 
     # run database portion
     if args.generate_database:
-        report["database_results"] = generate_database(args, db)
+        report["database_results"] = generate_database(args, db, ds_report)
 
     # add basic stats
     report["cpu_net_results"] = generate_cpu_network(args)
