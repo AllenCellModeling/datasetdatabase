@@ -14,6 +14,7 @@ fp_example/
 .DS_STORE
 local.db
 test.dataset
+docs/_build/
 
 # specific files
 generate_docs.ipynb

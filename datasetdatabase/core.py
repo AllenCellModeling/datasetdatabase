@@ -125,9 +125,7 @@ class DatabaseConfig(object):
 
         # assign name
         if name is None:
-                self.name = pathlib.Path(self.config["database"])\
-                            .with_suffix("")\
-                            .name
+            self.name = pathlib.Path(self.config["database"]).with_suffix("").name
 
     @property
     def config(self):
