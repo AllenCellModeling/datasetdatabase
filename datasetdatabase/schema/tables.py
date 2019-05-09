@@ -28,7 +28,7 @@ def create_Iota(schema: orator.Schema):
     if not schema.has_table("Iota"):
         with schema.create("Iota") as table:
             table.big_increments("IotaId")
-            table.string("Key", 50)
+            table.string("Key")
             table.binary("Value")
             table.datetime("Created")
             table.unique(["Key", "Value"])
